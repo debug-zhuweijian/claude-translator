@@ -81,8 +81,18 @@ def _discover_user_level(claude_dir: Path) -> list[Record]:
 
 
 def _discover_plugins(claude_dir: Path) -> list[Record]:
-    plugins_file = claude_dir / "installed_plugins.json"
-    if not plugins_file.exists():
+    # Try both known locations for the plugin registry
+    candidates = [
+        claude_dir / "plugins" / "installed_plugins.json",  # Claude Code v2+
+        claude_dir / "installed_plugins.json",               # legacy / custom
+    ]
+    plugins_file: Path | None = None
+    for c in candidates:
+        if c.exists():
+            plugins_file = c
+            break
+
+    if plugins_file is None:
         logger.info("No installed_plugins.json found")
         return []
 
@@ -92,13 +102,25 @@ def _discover_plugins(claude_dir: Path) -> list[Record]:
         logger.warning("Failed to read installed_plugins.json: %s", e)
         return []
 
-    if not isinstance(data, list):
+    # Support both formats:
+    #   v2: {"version": 2, "plugins": {"key@market": [{installPath: "..."}]}}
+    #   v1: [{installation_path: "..."}, ...]
+    entries: list[dict] = []
+    if isinstance(data, list):
+        entries = data
+    elif isinstance(data, dict) and "plugins" in data:
+        for _plugin_key, install_list in data["plugins"].items():
+            if isinstance(install_list, list):
+                entries.extend(install_list)
+
+    if not entries:
         return []
 
     # Deduplicate: keep only latest version per plugin_key
     latest: dict[str, Path] = {}
-    for entry in data:
-        path_str = entry.get("installation_path", "")
+    for entry in entries:
+        # Support both "installPath" (v2) and "installation_path" (v1)
+        path_str = entry.get("installPath") or entry.get("installation_path", "")
         if not path_str:
             continue
         plugin_dir = Path(path_str)

@@ -18,7 +18,7 @@ Claude Translator 一键解决：**扫描 → 翻译 → 注入**，自动完成
 
 ## 它做了什么
 
-把这样的 Markdown 文件：
+翻译前：
 
 ```yaml
 ---
@@ -28,7 +28,7 @@ description: Brainstorm ideas collaboratively
 # Brainstorm
 ```
 
-变成这样：
+翻译后：
 
 ```yaml
 ---
@@ -58,16 +58,9 @@ flowchart LR
     I --> J
 ```
 
-```mermaid
-graph LR
-    A[发现] --> B[翻译]
-    B --> C[注入]
-    C --> D[验证]
-```
-
 ## 快速开始
 
-### 安装
+### 1. 安装
 
 ```bash
 git clone https://github.com/debug-zhuweijian/claude-translator.git
@@ -75,68 +68,75 @@ cd claude-translator
 pip install .
 ```
 
-### 初始化
+验证安装：
+
+```
+$ claude-translator --version
+claude-translator, version 0.1.0
+```
+
+### 2. 初始化
+
+设置目标语言。这会创建 `~/.claude/translations/config.json`：
 
 ```bash
 $ claude-translator init --lang zh-CN
-Created config at ~/.claude/translations/config.json (target: zh-CN)
+Created config at C:\Users\you\.claude\translations\config.json (target: zh-CN)
 ```
 
-### 发现
+### 3. 发现
 
-```bash
+查看可翻译的内容。同时扫描**用户级**技能/命令和**已安装插件**：
+
+```
 $ claude-translator discover
-Scanning /home/user/.claude ...
-Found 47 translatable items (target: zh-CN)
-  ok [plugin] plugin.codex.agent:codex-rescue
+Scanning C:\Users\you\.claude ...
+Found 440 translatable items (target: zh-CN)
+  ok [user] user.skill:academic-writing
+  ok [user] user.skill:brainstorming
+  ok [user] user.command:commit
   ok [plugin] plugin.superpowers.skill:brainstorm
-  no [user] user.skill:my-custom-skill
+  ok [plugin] plugin.superpowers.skill:tdd-guide
+  ok [plugin] plugin.compound-engineering.skill:code-review
+  ok [plugin] plugin.everything-claude-code.agent:build-error-resolver
+  ok [plugin] plugin.everything-claude-code.skill:e2e
   ...
 ```
 
-### 翻译
+每行显示：状态（`ok` = 有 frontmatter，`no` = 缺失）、范围（`[user]` 或 `[plugin]`）、规范 ID。
 
-```bash
+### 4. 翻译
+
+执行翻译。每项使用 4 级回退——覆盖、缓存、LLM、原文：
+
+```
 $ claude-translator sync
-Scanning /home/user/.claude ...
-Translating 47 items to zh-CN ...
+Scanning C:\Users\you\.claude ...
+Translating 440 items to zh-CN ...
   [override] plugin.codex.agent:codex-rescue
   [cache] plugin.superpowers.skill:brainstorm
-  [llm] plugin.ecc-skills.command:commit
+  [llm] plugin.compound-engineering.skill:code-review
+  [llm] plugin.everything-claude-code.agent:build-error-resolver
   [skip] user.skill:my-custom-skill
+  ...
 Sync complete.
 ```
 
-### 验证
+状态标签说明：
+- `[override]` — 来自手动 `overrides-zh-CN.json`
+- `[cache]` — 之前 LLM 已翻译，保存在 `cache-zh-CN.json`
+- `[llm]` — 本次由 LLM 新翻译，翻译后自动缓存
+- `[skip]` — 无需更改（已翻译或为空）
 
-```bash
+### 5. 验证
+
+同步后检查覆盖率：
+
+```
 $ claude-translator verify
   MISSING: plugin.new-tool.skill:deploy
-Coverage: 46/47 (97.9%) — 1 missing
+Coverage: 439/440 (99.8%) — 1 missing
 ```
-
-## 功能特性
-
-| 特性 | 说明 |
-|------|------|
-| **自动发现** | 扫描 `~/.claude/` 下所有插件、技能、命令和 Agent |
-| **4 级回退** | 用户覆盖 → 缓存翻译 → LLM 翻译 → 原文 |
-| **人工覆盖** | 通过 `overrides-{lang}.json` 精调任意翻译 |
-| **多版本去重** | 同一插件多个版本？只翻译最新版 |
-| **CJK 支持** | 内置中文、日文、韩文脚本检测 |
-| **OpenAI 兼容** | 支持 OpenAI、Ollama、vLLM 等任何兼容 API |
-| **换行安全** | Windows 下保留 CRLF，不破坏文件 |
-| **旧版迁移** | 首次运行自动迁移旧格式翻译数据 |
-| **配置级联** | CLI 参数 → 环境变量 → 配置文件 → 默认值 |
-
-## CLI 命令参考
-
-| 命令 | 说明 |
-|------|------|
-| `init --lang LANG` | 创建配置，指定目标语言 |
-| `discover [--lang LANG]` | 列出可翻译项及状态 |
-| `sync [--lang LANG]` | 执行翻译并写入文件 |
-| `verify [--lang LANG]` | 检查覆盖率，报告缺失项 |
 
 ## 配置
 
@@ -167,6 +167,8 @@ CLI 参数  >  环境变量  >  config.json  >  默认值
 
 ### 使用本地模型
 
+没有 OpenAI 密钥？使用本地模型：
+
 ```bash
 # Ollama
 export CLAUDE_TRANSLATE_LLM_BASE_URL="http://localhost:11434/v1"
@@ -178,6 +180,53 @@ export CLAUDE_TRANSLATE_LLM_BASE_URL="http://localhost:8000/v1"
 export CLAUDE_TRANSLATE_LLM_MODEL="Qwen/Qwen2.5-7B-Instruct"
 ```
 
+### 人工覆盖
+
+编辑 `~/.claude/translations/overrides-zh-CN.json` 修正任意翻译：
+
+```json
+{
+  "plugin.superpowers.skill:brainstorm": "协作式头脑风暴创意生成"
+}
+```
+
+覆盖翻译优先级最高——`sync` 永远不会覆盖它。
+
+## 扫描范围
+
+| 来源 | 路径 | 示例 |
+|------|------|------|
+| 用户技能 | `~/.claude/skills/**/*.md` | `SKILL.md`、`my-skill.md` |
+| 用户命令 | `~/.claude/commands/**/*.md` | `commit.md`、`review.md` |
+| 插件技能 | `<plugin>/skills/**/*.md` | 各插件的技能定义 |
+| 插件命令 | `<plugin>/commands/**/*.md` | 各插件的斜杠命令 |
+| 插件 Agent | `<plugin>/agents/**/*.md` | 各插件的 Agent 定义 |
+
+插件注册表从 `~/.claude/plugins/installed_plugins.json`（v2 格式）读取，回退到 `~/.claude/installed_plugins.json`（v1 格式）。多版本插件自动去重——只翻译最新版本。
+
+## 功能特性
+
+| 特性 | 说明 |
+|------|------|
+| **自动发现** | 扫描 `~/.claude/` 下所有插件、技能、命令和 Agent |
+| **4 级回退** | 用户覆盖 → 缓存翻译 → LLM 翻译 → 原文 |
+| **人工覆盖** | 通过 `overrides-{lang}.json` 精调任意翻译 |
+| **多版本去重** | 同一插件多个版本？只翻译最新版 |
+| **CJK 支持** | 内置中文、日文、韩文脚本检测 |
+| **OpenAI 兼容** | 支持 OpenAI、Ollama、vLLM 等任何兼容 API |
+| **换行安全** | Windows 下保留 CRLF，不破坏文件 |
+| **旧版迁移** | 首次运行自动迁移旧格式翻译数据 |
+| **配置级联** | CLI 参数 → 环境变量 → 配置文件 → 默认值 |
+
+## CLI 命令参考
+
+| 命令 | 说明 |
+|------|------|
+| `init --lang LANG` | 创建配置，指定目标语言 |
+| `discover [--lang LANG]` | 列出可翻译项及状态 |
+| `sync [--lang LANG]` | 执行翻译并写入文件 |
+| `verify [--lang LANG]` | 检查覆盖率，报告缺失项 |
+
 ## 架构
 
 ```mermaid
@@ -187,9 +236,10 @@ graph TB
     CLI --> INJ[Injector]
     CLI --> MIGR[Migration]
 
-    DISC --> |扫描插件| PLUGIN[installed_plugins.json]
-    DISC --> |扫描用户级| USER[~/.claude/skills/]
-    DISC --> |扫描用户级| USERC[~/.claude/commands/]
+    DISC --> |v2 格式| V2["plugins/installed_plugins.json"]
+    DISC --> |v1 回退| V1["installed_plugins.json"]
+    DISC --> |扫描用户级| USER["~/.claude/skills/"]
+    DISC --> |扫描用户级| USERC["~/.claude/commands/"]
 
     TRANS --> |1st| OV["overrides-{lang}.json"]
     TRANS --> |2nd| CACHE["cache-{lang}.json"]
@@ -205,7 +255,7 @@ graph TB
 
 支持 LLM 能处理的任何语言。内置 prompt 模板：
 
-英语 → 中文 / 日语 / 韩语，中文 → 日语 / 韩语
+英语 → 中文（简体/繁体） / 日语 / 韩语，中文 → 日语 / 韩语
 
 ## 开发
 
