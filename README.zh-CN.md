@@ -4,7 +4,7 @@
 
 **Claude Code 插件描述多语言翻译工具**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![Version](https://img.shields.io/badge/version-0.1.0-orange.svg)](CHANGELOG.md) [![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/) [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![Version](https://img.shields.io/badge/version-0.1.0-orange.svg)](CHANGELOG.md) [![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
 
 [English](README.md) | [中文](README.zh-CN.md) | [日本語](README.ja.md) | [한국어](README.ko.md)
 
@@ -191,8 +191,8 @@ graph TB
     DISC --> |扫描用户级| USER[~/.claude/skills/]
     DISC --> |扫描用户级| USERC[~/.claude/commands/]
 
-    TRANS --> |1st| OV[overrides-{lang}.json]
-    TRANS --> |2nd| CACHE[cache-{lang}.json]
+    TRANS --> |1st| OV["overrides-{lang}.json"]
+    TRANS --> |2nd| CACHE["cache-{lang}.json"]
     TRANS --> |3rd| LLM[LLM Client]
 
     INJ --> |写入| FM[YAML Frontmatter]
