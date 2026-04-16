@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.eggs/
+.pytest_cache/
+.ruff_cache/
+*.egg
+
+# AI session & memory
+.claude/
+sessions/
+memories/
+*.session.json
+*.memory.md
+
+# Design process (internal)
+docs/superpowers/
+docs/brainstorm-*
+docs/research-*
+
+# Secrets & credentials
+*.env
+*.key
+*.token
+*.secret
+**/api-keys-local.json
+**/*-local.*
+**/*-private.*
+
+# Personal data & cache
+downloads/
+*.log
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
