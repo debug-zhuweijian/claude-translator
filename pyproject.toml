@@ -1,0 +1,35 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "claude-translator"
+version = "0.1.0"
+description = "Multi-language plugin description translator for Claude Code"
+requires-python = ">=3.10"
+dependencies = [
+    "click>=8.0",
+    "pydantic>=2.0",
+    "openai>=1.0",
+]
+
+[project.optional-dependencies]
+cjk = ["lingua-py>=2.0"]
+dev = [
+    "pytest>=7.0",
+    "pyfakefs>=5.0",
+    "ruff>=0.4",
+]
+
+[project.scripts]
+claude-translator = "claude_translator.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/claude_translator"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
