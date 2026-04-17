@@ -15,10 +15,15 @@ def get_claude_dir() -> Path:
 
 
 def get_translations_dir() -> Path:
-    """Return the translations directory, creating it if needed."""
-    d = get_claude_dir() / "translations"
-    d.mkdir(parents=True, exist_ok=True)
-    return d
+    """Return the translations directory path without creating it."""
+    return get_claude_dir() / "translations"
+
+
+def ensure_translations_dir() -> Path:
+    """Create and return the translations directory."""
+    translations_dir = get_translations_dir()
+    translations_dir.mkdir(parents=True, exist_ok=True)
+    return translations_dir
 
 
 def get_overrides_path(lang: str) -> Path:

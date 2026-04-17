@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import os
 
+from claude_translator.lang.cleaner import clean_llm_response
 from claude_translator.lang.prompts import get_prompt
 
 logger = logging.getLogger(__name__)
@@ -13,10 +14,13 @@ logger = logging.getLogger(__name__)
 class OpenAICompatClient:
     def __init__(self, model: str, base_url: str | None = None, api_key: str | None = None) -> None:
         from openai import OpenAI
+
         self._model = model
         self._client = OpenAI(
             base_url=base_url or os.getenv("OPENAI_BASE_URL"),
             api_key=api_key or os.getenv("OPENAI_API_KEY", ""),
+            timeout=30.0,
+            max_retries=2,
         )
 
     def translate(self, text: str, source_lang: str, target_lang: str) -> str:
@@ -33,4 +37,4 @@ class OpenAICompatClient:
         result = response.choices[0].message.content
         if result is None:
             raise RuntimeError("LLM returned empty response")
-        return result.strip()
+        return clean_llm_response(result)

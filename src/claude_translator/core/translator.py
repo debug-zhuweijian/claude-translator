@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import replace
-from typing import Callable
 
+from claude_translator.clients.base import LLMClient
 from claude_translator.core.models import Record
 
 logger = logging.getLogger(__name__)
@@ -14,17 +15,25 @@ logger = logging.getLogger(__name__)
 class TranslationChain:
     def __init__(
         self,
-        overrides_loader: Callable[[str], dict[str, str]],
-        cache_loader: Callable[[str], dict[str, str]],
-        cache_updater: Callable[[str, str, str], None],
-        client: object,
+        overrides: dict[str, str],
+        cache: dict[str, str],
+        on_cache_update: Callable[[str, str, str], None],
+        client: LLMClient,
         target_lang: str,
     ) -> None:
-        self._overrides_loader = overrides_loader
-        self._cache_loader = cache_loader
-        self._cache_updater = cache_updater
+        self._overrides = overrides
+        self._cache = cache
+        self._on_cache_update = on_cache_update
         self._client = client
         self._target_lang = target_lang
+        self._failures: list[tuple[Record, Exception]] = []
+
+    @property
+    def failures(self) -> list[tuple[Record, Exception]]:
+        return list(self._failures)
+
+    def has_override(self, canonical_id: str) -> bool:
+        return canonical_id in self._overrides
 
     def translate(self, record: Record) -> Record:
         cid = record.canonical_id
@@ -33,19 +42,19 @@ class TranslationChain:
         if not desc:
             return replace(record, matched_translation="", status="empty")
 
-        overrides = self._overrides_loader(self._target_lang)
-        if cid in overrides:
-            return replace(record, matched_translation=overrides[cid], status="override")
+        if cid in self._overrides:
+            return replace(record, matched_translation=self._overrides[cid], status="override")
 
-        cache = self._cache_loader(self._target_lang)
-        if cid in cache:
-            return replace(record, matched_translation=cache[cid], status="cache")
+        if cid in self._cache:
+            return replace(record, matched_translation=self._cache[cid], status="cache")
 
         try:
             translation = self._client.translate(desc, "en", self._target_lang)
-            self._cache_updater(self._target_lang, cid, translation)
+            self._cache[cid] = translation
+            self._on_cache_update(self._target_lang, cid, translation)
             return replace(record, matched_translation=translation, status="llm")
-        except Exception:
-            logger.warning("LLM translation failed for %s, falling back to original", cid)
+        except Exception as exc:
+            logger.warning("LLM translation failed for %s, falling back to original: %s", cid, exc)
+            self._failures.append((record, exc))
 
         return replace(record, matched_translation=desc, status="original")

@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Literal
+
+Status = Literal["override", "cache", "llm", "original", "empty", ""]
 
 
 @dataclass(frozen=True)
@@ -16,7 +19,7 @@ class Record:
     relative_path: str
     plugin_key: str = ""
     current_description: str = ""
-    status: str = ""
+    status: Status = ""
     matched_translation: str = ""
     frontmatter_present: bool = True
 

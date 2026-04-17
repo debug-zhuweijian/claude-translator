@@ -13,8 +13,10 @@ _HANGUL_RE = re.compile(r"[\uac00-\ud7af\u1100-\u11ff\u3130-\u318f]")
 def has_cjk(text: str) -> bool:
     return bool(_CJK_RE.search(text))
 
+
 def has_ja(text: str) -> bool:
     return bool(_HIRAGANA_RE.search(text) or _KATAKANA_RE.search(text))
+
 
 def has_ko(text: str) -> bool:
     return bool(_HANGUL_RE.search(text))

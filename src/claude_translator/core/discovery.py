@@ -6,6 +6,8 @@ import json
 import logging
 from pathlib import Path
 
+from packaging.version import InvalidVersion, Version
+
 from claude_translator.core.canonical import generate_canonical_id, name_from_filename
 from claude_translator.core.frontmatter import FrontmatterParser
 from claude_translator.core.models import Inventory, Record
@@ -67,20 +69,34 @@ def _discover_user_level(claude_dir: Path) -> list[Record]:
             fm, _ = parser.parse(content)
             desc = parser.get_description(fm) or ""
 
-            records.append(Record(
-                canonical_id=cid, kind=kind, scope="user",
-                source_path=str(md_file),
-                relative_path=normalize_path(str(relative)),
-                current_description=desc,
-                frontmatter_present=bool(fm),
-            ))
+            records.append(
+                Record(
+                    canonical_id=cid,
+                    kind=kind,
+                    scope="user",
+                    source_path=str(md_file),
+                    relative_path=normalize_path(str(relative)),
+                    current_description=desc,
+                    frontmatter_present=bool(fm),
+                )
+            )
 
     return records
 
 
 def _discover_plugins(claude_dir: Path) -> list[Record]:
-    plugins_file = claude_dir / "installed_plugins.json"
-    if not plugins_file.exists():
+    # Try both known locations for the plugin registry
+    candidates = [
+        claude_dir / "plugins" / "installed_plugins.json",  # Claude Code v2+
+        claude_dir / "installed_plugins.json",  # legacy / custom
+    ]
+    plugins_file: Path | None = None
+    for c in candidates:
+        if c.exists():
+            plugins_file = c
+            break
+
+    if plugins_file is None:
         logger.info("No installed_plugins.json found")
         return []
 
@@ -90,31 +106,59 @@ def _discover_plugins(claude_dir: Path) -> list[Record]:
         logger.warning("Failed to read installed_plugins.json: %s", e)
         return []
 
-    if not isinstance(data, list):
+    # Support both formats:
+    #   v2: {"version": 2, "plugins": {"key@market": [{installPath: "..."}]}}
+    #   v1: [{installation_path: "..."}, ...]
+    entries: list[dict] = []
+    if isinstance(data, list):
+        entries = data
+    elif isinstance(data, dict) and "plugins" in data:
+        for registry_key, install_list in data["plugins"].items():
+            if isinstance(install_list, list):
+                for entry in install_list:
+                    merged = dict(entry)
+                    merged["_registry_plugin_key"] = _plugin_key_from_registry_key(registry_key)
+                    entries.append(merged)
+
+    if not entries:
         return []
 
-    records: list[Record] = []
-    parser = FrontmatterParser()
-
-    for entry in data:
-        path_str = entry.get("installation_path", "")
+    # Deduplicate: keep only latest version per plugin_key
+    latest: dict[str, tuple[dict, Path]] = {}
+    for entry in entries:
+        # Support both "installPath" (v2) and "installation_path" (v1)
+        path_str = entry.get("installPath") or entry.get("installation_path", "")
         if not path_str:
             continue
         plugin_dir = Path(path_str)
         if not plugin_dir.is_dir():
             continue
+        plugin_key = str(entry.get("_registry_plugin_key") or _extract_plugin_key(plugin_dir))
+        existing = latest.get(plugin_key)
+        if existing is None or _extract_version(plugin_dir) > _extract_version(existing[1]):
+            latest[plugin_key] = (entry, plugin_dir)
 
-        plugin_key = _extract_plugin_key(plugin_dir)
+    records: list[Record] = []
+    parser = FrontmatterParser()
+    for plugin_key, (_, plugin_dir) in latest.items():
         records.extend(_scan_plugin_dir(plugin_dir, plugin_key, parser))
 
     return records
 
 
+def _extract_version(path: Path) -> Version:
+    """Extract version number from plugin path (e.g., .../1.0.0 → Version('1.0.0'))."""
+    try:
+        return Version(path.name)
+    except InvalidVersion:
+        return Version("0")
+
+
+def _plugin_key_from_registry_key(registry_key: str) -> str:
+    return registry_key.split("@", 1)[0]
+
+
 def _extract_plugin_key(plugin_dir: Path) -> str:
-    parts = plugin_dir.parts
-    for i in range(len(parts) - 2, -1, -1):
-        if parts[i] == "market" and i + 2 < len(parts):
-            return parts[i + 1]
     return plugin_dir.parent.name
 
 
@@ -145,13 +189,17 @@ def _scan_plugin_dir(plugin_dir: Path, plugin_key: str, parser: FrontmatterParse
             fm, _ = parser.parse(content)
             desc = parser.get_description(fm) or ""
 
-            records.append(Record(
-                canonical_id=cid, kind=kind, scope="plugin",
-                source_path=str(md_file),
-                relative_path=normalize_path(str(relative)),
-                plugin_key=plugin_key,
-                current_description=desc,
-                frontmatter_present=bool(fm),
-            ))
+            records.append(
+                Record(
+                    canonical_id=cid,
+                    kind=kind,
+                    scope="plugin",
+                    source_path=str(md_file),
+                    relative_path=normalize_path(str(relative)),
+                    plugin_key=plugin_key,
+                    current_description=desc,
+                    frontmatter_present=bool(fm),
+                )
+            )
 
     return records

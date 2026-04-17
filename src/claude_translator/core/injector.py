@@ -22,15 +22,20 @@ def inject_translation(record: Record) -> Record:
         logger.warning("File not found: %s", file_path)
         return record
 
-    content = file_path.read_bytes().decode("utf-8")
+    raw_bytes = file_path.read_bytes()
+    has_bom = raw_bytes.startswith(b"\xef\xbb\xbf")
+    content = raw_bytes.decode("utf-8-sig" if has_bom else "utf-8")
     newline = detect_newline(content)
     parser = FrontmatterParser()
 
     fm, body = parser.parse(content)
-    new_fm = parser.set_description(fm, record.matched_translation)
-    new_content = parser.build(new_fm, body)
+    parser.set_description(fm, record.matched_translation)
+    new_content = parser.build(fm, body)
 
     new_content = new_content.replace("\r\n", "\n").replace("\n", newline)
-    file_path.write_bytes(new_content.encode("utf-8"))
+    out_bytes = new_content.encode("utf-8")
+    if has_bom:
+        out_bytes = b"\xef\xbb\xbf" + out_bytes
+    file_path.write_bytes(out_bytes)
 
     return replace(record, frontmatter_present=True)

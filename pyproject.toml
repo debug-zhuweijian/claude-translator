@@ -4,13 +4,15 @@ build-backend = "hatchling.build"
 
 [project]
 name = "claude-translator"
-version = "0.1.0"
+version = "0.2.0"
 description = "Multi-language plugin description translator for Claude Code"
 requires-python = ">=3.10"
 dependencies = [
     "click>=8.0",
+    "packaging>=21.0",
     "pydantic>=2.0",
     "openai>=1.0",
+    "ruamel.yaml>=0.18",
 ]
 
 [project.optional-dependencies]
@@ -33,3 +35,6 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 100
 target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

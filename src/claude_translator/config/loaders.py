@@ -33,14 +33,17 @@ def load_config(
             logger.warning("Failed to read config file %s: %s", config_path, e)
 
     # Layer 2: env overrides for LLM
-    env_base_url = os.getenv("OPENAI_BASE_URL")
-    env_api_key = os.getenv("OPENAI_API_KEY")
+    env_base_url = os.getenv("CLAUDE_TRANSLATE_LLM_BASE_URL") or os.getenv("OPENAI_BASE_URL")
+    env_api_key = os.getenv("CLAUDE_TRANSLATE_LLM_API_KEY") or os.getenv("OPENAI_API_KEY")
+    env_model = os.getenv("CLAUDE_TRANSLATE_LLM_MODEL") or os.getenv("OPENAI_MODEL")
 
     llm_data = dict(file_data.get("llm", {}))
     if env_base_url:
         llm_data["base_url"] = env_base_url
     if env_api_key:
         llm_data["api_key"] = env_api_key
+    if env_model:
+        llm_data["model"] = env_model
 
     # Layer 2b: env override for target_lang
     env_lang = os.getenv("CLAUDE_TRANSLATE_LANG")
