@@ -306,6 +306,28 @@ CLI args  >  Environment variables  >  config.json  >  Defaults
 | `CLAUDE_TRANSLATE_LLM_API_KEY` | API key | `OPENAI_API_KEY` |
 | `CLAUDE_TRANSLATE_LLM_MODEL` | Model name | `OPENAI_MODEL` or `gpt-4o-mini` |
 
+### Example Configuration
+
+`~/.claude/translations/config.json`:
+
+```json
+{
+  "target_lang": "zh-CN",
+  "llm": {
+    "model": "gpt-4o-mini",
+    "base_url": "https://api.openai.com/v1",
+    "api_key": null
+  },
+  "plugins_dirs": []
+}
+```
+
+Key options:
+- `target_lang`: Target language code (e.g., `zh-CN`, `ja`, `ko`)
+- `llm.model`: Any OpenAI-compatible model name
+- `llm.base_url`: Set to use local models (Ollama, vLLM, etc.)
+- `llm.api_key`: Leave `null` to use `OPENAI_API_KEY` environment variable
+
 ### Data Files
 
 All stored in `~/.claude/translations/`:

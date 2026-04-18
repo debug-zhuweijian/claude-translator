@@ -17,5 +17,9 @@ class PathError(UserError):
     """~/.claude/ directory missing or inaccessible."""
 
 
+class FileSystemError(UserError):
+    """File system operation failed (permissions, disk, etc.)."""
+
+
 class InternalError(TranslatorError):
     """Program bugs — should never occur in production."""

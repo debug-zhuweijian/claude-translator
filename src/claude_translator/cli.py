@@ -30,11 +30,20 @@ from claude_translator.storage.paths import (
 logger = logging.getLogger(__name__)
 
 
+def _configure_logging(verbose: int, quiet: int) -> None:
+    """Map -v/-q flags to logging levels."""
+    level = logging.INFO - 10 * verbose + 10 * quiet
+    level = max(logging.DEBUG, min(logging.CRITICAL, level))
+    logging.basicConfig(level=level, format="%(levelname)s: %(message)s")
+
+
 @click.group()
 @click.version_option(version=__version__)
-def main() -> None:
+@click.option("-v", "--verbose", count=True, help="Increase verbosity")
+@click.option("-q", "--quiet", count=True, help="Decrease verbosity")
+def main(verbose: int, quiet: int) -> None:
     """Claude Description Translator — multi-language plugin description translator."""
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+    _configure_logging(verbose, quiet)
 
 
 @main.command()
@@ -83,16 +92,16 @@ def sync(lang: str | None, dry_run: bool) -> None:
     def on_cache_update(_lang: str, cid: str, text: str) -> None:
         updated_cache[cid] = text
 
-    client = OpenAICompatClient(
-        base_url=config.llm.base_url or None,
-        api_key=config.llm.api_key or None,
-        model=config.llm.model,
-    )
     chain = TranslationChain(
         overrides=overrides,
         cache=cache,
         on_cache_update=on_cache_update,
-        client=client,
+        # Delay OpenAI import until the first true LLM miss.
+        client_factory=lambda: OpenAICompatClient(
+            base_url=config.llm.base_url or None,
+            api_key=config.llm.api_key or None,
+            model=config.llm.model,
+        ),
         target_lang=config.target_lang,
     )
 

@@ -4,8 +4,14 @@ build-backend = "hatchling.build"
 
 [project]
 name = "claude-translator"
-version = "0.2.0"
+version = "0.2.1"
 description = "Multi-language plugin description translator for Claude Code"
+
+[project.urls]
+Homepage = "https://github.com/debug-zhuweijian/claude-translator"
+Repository = "https://github.com/debug-zhuweijian/claude-translator"
+Issues = "https://github.com/debug-zhuweijian/claude-translator/issues"
+
 requires-python = ">=3.10"
 dependencies = [
     "click>=8.0",

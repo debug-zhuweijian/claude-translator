@@ -18,6 +18,8 @@ _PREFIX_RE = re.compile(
     re.IGNORECASE,
 )
 
+_NEWLINE_RE = re.compile(r"\s*[\r\n]+\s*")
+
 
 class TranslationCleaner:
     """Normalize common LLM response wrappers and reject dangerous output."""
@@ -32,8 +34,8 @@ class TranslationCleaner:
 
         if not result:
             raise TranslatorError("LLM returned an empty translation")
-        if "\n" in result or "\r" in result:
-            raise TranslatorError("LLM returned a multi-line translation")
+        # Merge internal newlines to spaces (some languages use compound sentences)
+        result = _NEWLINE_RE.sub(" ", result).strip()
         if "---" in result:
             raise TranslatorError("LLM returned content that would break frontmatter")
 
