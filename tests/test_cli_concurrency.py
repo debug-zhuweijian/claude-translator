@@ -32,6 +32,27 @@ def _inventory(tmp_path: Path) -> Inventory:
     return Inventory((record,))
 
 
+def _record(
+    tmp_path: Path,
+    name: str,
+    description: str,
+    *,
+    frontmatter_present: bool = True,
+) -> Record:
+    md = tmp_path / f"{name}.md"
+    md.write_text(f"---\ndescription: {description}\n---\n# Body\n", encoding="utf-8")
+    return Record(
+        canonical_id=f"plugin.demo.skill:{name}",
+        kind="skill",
+        scope="plugin",
+        source_path=str(md),
+        relative_path=f"skills/{name}/SKILL.md",
+        plugin_key="demo",
+        current_description=description,
+        frontmatter_present=frontmatter_present,
+    )
+
+
 @pytest.fixture(autouse=True)
 def fake_environment(tmp_path: Path, monkeypatch):
     translations_dir = tmp_path / "translations"
@@ -134,3 +155,112 @@ def test_sync_dispatches_async_mode(tmp_path: Path, monkeypatch):
     assert called["mode"] == "async"
     assert called["kwargs"]["concurrency"] == 3
     assert called["kwargs"]["dry_run"] is True
+
+
+def test_discover_lists_records(tmp_path: Path, monkeypatch):
+    inventory = Inventory(
+        (
+            _record(tmp_path, "brainstorm", "Brainstorm ideas"),
+            _record(tmp_path, "draft", "Draft docs", frontmatter_present=False),
+        )
+    )
+    monkeypatch.setattr(cli_module, "discover_all", lambda _: inventory)
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["discover", "--lang", "ja"])
+
+    assert result.exit_code == 0, result.output
+    assert "Found 2 translatable items (target: ja)" in result.output
+    assert "ok [plugin] plugin.demo.skill:brainstorm" in result.output
+    assert "no [plugin] plugin.demo.skill:draft" in result.output
+
+
+def test_sync_exits_early_when_inventory_is_empty(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(cli_module, "discover_all", lambda _: Inventory(()))
+    save_calls: list[tuple[str, dict[str, str]]] = []
+    monkeypatch.setattr(
+        cli_module,
+        "save_cache",
+        lambda lang, data: save_calls.append((lang, data)),
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["sync", "--no-async"])
+
+    assert result.exit_code == 0, result.output
+    assert "No translatable items found." in result.output
+    assert save_calls == []
+
+
+def test_sync_saves_cache_and_reports_failures(tmp_path: Path, monkeypatch):
+    record = _record(tmp_path, "brainstorm", "Brainstorm ideas")
+    monkeypatch.setattr(cli_module, "discover_all", lambda _: Inventory((record,)))
+    saved: list[tuple[str, dict[str, str]]] = []
+    monkeypatch.setattr(
+        cli_module,
+        "save_cache",
+        lambda lang, data: saved.append((lang, dict(data))),
+    )
+
+    def fake_run_sync(inventory, chain, target_lang, dry_run=False):
+        chain._on_cache_update(target_lang, record.canonical_id, "头脑风暴")
+        chain._failures.append((record, RuntimeError("boom")))
+        return SyncReport(total=1, failed=1)
+
+    monkeypatch.setattr(cli_module, "run_sync", fake_run_sync)
+    runner = CliRunner()
+    result = runner.invoke(main, ["sync", "--no-async"])
+
+    assert result.exit_code == 1
+    assert "Sync complete: total=1, failed=1" in result.output
+    assert "FAILED: plugin.demo.skill:brainstorm - boom" in result.output
+    assert saved == [("zh-CN", {record.canonical_id: "头脑风暴"})]
+
+
+def test_verify_rejects_non_cjk_targets(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(cli_module, "discover_all", lambda _: _inventory(tmp_path))
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["verify", "--lang", "fr"])
+
+    assert result.exit_code == 0, result.output
+    assert "Verification by script is only supported for zh/ja/ko targets; got fr." in result.output
+
+
+def test_verify_reports_covered_and_missing_records(tmp_path: Path, monkeypatch):
+    covered = tmp_path / "covered.md"
+    covered.write_text("---\ndescription: 中文描述\n---\n# Body\n", encoding="utf-8")
+    missing = tmp_path / "missing.md"
+    missing.write_text("---\ndescription: English text\n---\n# Body\n", encoding="utf-8")
+    inventory = Inventory(
+        (
+            Record(
+                canonical_id="plugin.demo.skill:covered",
+                kind="skill",
+                scope="plugin",
+                source_path=str(covered),
+                relative_path="skills/covered/SKILL.md",
+                plugin_key="demo",
+                current_description="Brainstorm ideas",
+                frontmatter_present=True,
+            ),
+            Record(
+                canonical_id="plugin.demo.skill:missing",
+                kind="skill",
+                scope="plugin",
+                source_path=str(missing),
+                relative_path="skills/missing/SKILL.md",
+                plugin_key="demo",
+                current_description="Draft docs",
+                frontmatter_present=True,
+            ),
+        )
+    )
+    monkeypatch.setattr(cli_module, "discover_all", lambda _: inventory)
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["verify"])
+
+    assert result.exit_code == 0, result.output
+    assert "MISSING: plugin.demo.skill:missing" in result.output
+    assert "Coverage: 1/2 (50.0%)" in result.output
