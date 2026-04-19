@@ -16,7 +16,12 @@ def _read_local_version() -> str | None:
     return match.group(1) if match else None
 
 
-try:
-    __version__ = _pkg_version("claude-translator")
-except PackageNotFoundError:
-    __version__ = _read_local_version() or "0.2.1"
+_LOCAL_VERSION = _read_local_version()
+
+if _LOCAL_VERSION is not None:
+    __version__ = _LOCAL_VERSION
+else:
+    try:
+        __version__ = _pkg_version("claude-translator")
+    except PackageNotFoundError:
+        __version__ = "0.3.0"

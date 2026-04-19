@@ -5,6 +5,11 @@ from pathlib import Path
 import pytest
 
 
+def pytest_addoption(parser):
+    """Allow asyncio_mode config even when pytest-asyncio is unavailable locally."""
+    parser.addini("asyncio_mode", "Async test mode", default="auto")
+
+
 @pytest.fixture
 def tmp_claude_dir(tmp_path: Path) -> Path:
     """Create a temporary .claude directory structure."""

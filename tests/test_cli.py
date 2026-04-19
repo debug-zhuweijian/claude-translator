@@ -4,6 +4,7 @@ from pathlib import Path
 
 from click.testing import CliRunner
 
+import claude_translator as package
 import claude_translator.cli as cli_module
 from claude_translator import __version__
 from claude_translator.cli import main
@@ -31,6 +32,10 @@ def test_cli_version():
     result = runner.invoke(main, ["--version"])
     assert result.exit_code == 0
     assert __version__ in result.output
+
+
+def test_version_prefers_local_checkout_version():
+    assert package.__version__ == package._read_local_version()
 
 
 def test_cli_sync_help_mentions_dry_run():
@@ -66,8 +71,6 @@ def test_verbose_quiet_flags_in_help():
 
 
 def test_configure_logging_levels():
-    from claude_translator.cli import _configure_logging
-
     # Test the mapping directly without relying on basicConfig side effects
     assert logging.INFO - 10 * 1 + 10 * 0 == logging.DEBUG  # -v → DEBUG
     assert logging.INFO - 10 * 0 + 10 * 1 == logging.WARNING  # -q → WARNING

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "claude-translator"
-version = "0.2.1"
+version = "0.3.0"
 description = "Multi-language plugin description translator for Claude Code"
 
 [project.urls]
@@ -19,12 +19,14 @@ dependencies = [
     "pydantic>=2.0",
     "openai>=1.0",
     "ruamel.yaml>=0.18",
+    "rich>=13.0",
 ]
 
 [project.optional-dependencies]
 cjk = ["lingua-py>=2.0"]
 dev = [
     "pytest>=7.0",
+    "pytest-asyncio>=0.23",
     "pyfakefs>=5.0",
     "ruff>=0.4",
 ]
@@ -37,6 +39,7 @@ packages = ["src/claude_translator"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+asyncio_mode = "auto"
 
 [tool.ruff]
 line-length = 100
