@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from io import StringIO
 
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
+
+logger = logging.getLogger(__name__)
 
 
 class FrontmatterParser:
@@ -26,7 +29,8 @@ class FrontmatterParser:
 
         try:
             fm = self._yaml.load(fm_raw) or CommentedMap()
-        except Exception:
+        except Exception as exc:
+            logger.warning("Failed to parse YAML frontmatter: %s", exc)
             return CommentedMap(), content
 
         if not isinstance(fm, CommentedMap):
