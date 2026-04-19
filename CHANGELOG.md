@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-04-19
+
+### Added
+
+- **Async translation stack** -- introduced `AsyncLLMClient`, async OpenAI-compatible and fake clients, plus `TranslationChain.translate_async`
+- **Concurrent pipeline execution** -- added `run_async()` with bounded concurrency, cache-write locking, and CLI `--concurrency` / `--async` controls
+- **Rich progress feedback** -- async `sync` now renders progress with `rich.progress` for large batches
+- **Safer reporting and tests** -- added dedicated `empty` reporting and regression coverage for Phase 1/2 changes
+
+### Fixed
+
+- **Empty translation accounting** -- blank model output is now counted as `empty` instead of being merged into `skip`
+- **Pipeline branch cleanup** -- removed dead fallback logic and kept matched-translation checks on the only reachable path
+- **Frontmatter diagnostics** -- malformed YAML frontmatter now emits a warning instead of failing silently
+- **Write-path hardening** -- translation injection now enforces an `allowed_paths` whitelist before mutating files
+- **Prompt injection isolation** -- user text is wrapped inside `<text_to_translate>` tags before being sent to the LLM
+- **OpenAI API key fail-fast** -- client construction now stops early with an explicit error when no API key is configured
+
 ## [0.2.0] - 2026-04-17
 
 ### Changed
@@ -51,6 +69,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Immutable data models** -- frozen dataclasses throughout
 
 [0.2.0]: https://github.com/debug-zhuweijian/claude-translator/releases/tag/v0.2.0
+[0.3.0]: https://github.com/debug-zhuweijian/claude-translator/releases/tag/v0.3.0
 [0.1.2]: https://github.com/debug-zhuweijian/claude-translator/releases/tag/v0.1.2
 [0.1.1]: https://github.com/debug-zhuweijian/claude-translator/releases/tag/v0.1.1
 [0.1.0]: https://github.com/debug-zhuweijian/claude-translator/releases/tag/v0.1.0
