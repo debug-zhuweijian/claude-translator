@@ -4,6 +4,10 @@ from claude_translator.core.injector import inject_translation
 from claude_translator.core.models import Record
 
 
+def _allowed(path: Path) -> frozenset[Path]:
+    return frozenset({path.resolve()})
+
+
 def test_inject_creates_frontmatter(tmp_path: Path):
     md_file = tmp_path / "test.md"
     md_file.write_text("# Just a heading\nSome text", encoding="utf-8")
@@ -17,7 +21,7 @@ def test_inject_creates_frontmatter(tmp_path: Path):
         matched_translation="翻译文本",
         frontmatter_present=False,
     )
-    new_record = inject_translation(record)
+    new_record = inject_translation(record, allowed_paths=_allowed(md_file))
     content = md_file.read_text(encoding="utf-8")
     assert content.startswith("---")
     assert "description: 翻译文本" in content
@@ -38,7 +42,7 @@ def test_inject_updates_existing_frontmatter(tmp_path: Path):
         matched_translation="新翻译",
         frontmatter_present=True,
     )
-    inject_translation(record)
+    inject_translation(record, allowed_paths=_allowed(md_file))
     content = md_file.read_text(encoding="utf-8")
     assert "description: 新翻译" in content
     assert "Old" not in content
@@ -57,7 +61,7 @@ def test_inject_preserves_crlf(tmp_path: Path):
         matched_translation="CRLF翻译",
         frontmatter_present=True,
     )
-    inject_translation(record)
+    inject_translation(record, allowed_paths=_allowed(md_file))
     raw = md_file.read_bytes().decode("utf-8", errors="replace")
     assert "description: CRLF翻译" in raw or "description: CRLF" in raw
     assert b"\r\n" in md_file.read_bytes()
@@ -77,7 +81,7 @@ def test_inject_no_translation_skips(tmp_path: Path):
         matched_translation="",
         frontmatter_present=True,
     )
-    inject_translation(record)
+    inject_translation(record, allowed_paths=_allowed(md_file))
     assert md_file.read_text(encoding="utf-8") == original
 
 
@@ -95,7 +99,7 @@ def test_inject_preserves_utf8_bom(tmp_path: Path):
         matched_translation="你好",
         frontmatter_present=True,
     )
-    inject_translation(r)
+    inject_translation(r, allowed_paths=_allowed(f))
     result = f.read_bytes()
     assert result.startswith(b"\xef\xbb\xbf"), "BOM should be preserved"
     assert b"\xe4\xbd\xa0\xe5\xa5\xbd" in result  # 你好

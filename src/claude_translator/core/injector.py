@@ -13,11 +13,26 @@ from claude_translator.utils.paths import detect_newline
 logger = logging.getLogger(__name__)
 
 
-def inject_translation(record: Record) -> Record:
+def inject_translation(
+    record: Record,
+    *,
+    allowed_paths: frozenset[Path],
+) -> Record:
     if not record.matched_translation:
         return record
 
     file_path = Path(record.source_path)
+    resolved = file_path.resolve()
+
+    if resolved not in allowed_paths:
+        logger.warning(
+            "Refused inject: %s resolved to %s which is not in allowed_paths (whitelist size=%d)",
+            file_path,
+            resolved,
+            len(allowed_paths),
+        )
+        return record
+
     if not file_path.exists():
         logger.warning("File not found: %s", file_path)
         return record
