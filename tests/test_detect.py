@@ -1,4 +1,4 @@
-from claude_translator.lang.detect import detect_script
+from claude_translator.lang.detect import detect_script, has_cjk, has_ja, has_ko
 
 
 def test_detect_korean():
@@ -31,3 +31,9 @@ def test_detect_empty():
 
 def test_detect_numbers():
     assert detect_script("12345") == "unknown"
+
+
+def test_helpers_share_detection_source():
+    assert has_cjk("你好世界") is True
+    assert has_ja("こんにちは") is True
+    assert has_ko("안녕하세요") is True

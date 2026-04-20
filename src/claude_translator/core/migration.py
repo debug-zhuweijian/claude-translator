@@ -6,6 +6,8 @@ import json
 import logging
 from pathlib import Path
 
+from claude_translator.storage._io import atomic_write_text
+
 logger = logging.getLogger(__name__)
 
 
@@ -28,10 +30,7 @@ def migrate_legacy(translations_dir: Path, lang: str) -> None:
     try:
         data = json.loads(legacy_path.read_text(encoding="utf-8"))
         if isinstance(data, dict) and data:
-            new_path.write_text(
-                json.dumps(data, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
+            atomic_write_text(new_path, json.dumps(data, ensure_ascii=False, indent=2) + "\n")
             logger.info("Migrated %d overrides from legacy to %s", len(data), new_path.name)
     except (json.JSONDecodeError, OSError) as e:
         logger.warning("Skipping legacy overrides migration: %s", e)

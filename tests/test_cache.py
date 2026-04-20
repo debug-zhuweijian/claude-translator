@@ -68,7 +68,7 @@ def test_save_cache_permission_error(tmp_path: Path, monkeypatch):
     td.mkdir()
     _patch_cache_paths(monkeypatch, td)
     with patch(
-        "claude_translator.storage.cache._atomic_write_text",
+        "claude_translator.storage.cache.atomic_write_text",
         side_effect=PermissionError("denied"),
     ):
         with pytest.raises(FileSystemError, match="Cannot write"):

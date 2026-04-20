@@ -4,10 +4,9 @@ from __future__ import annotations
 
 import json
 import logging
-import tempfile
-from pathlib import Path
 
 from claude_translator.errors import FileSystemError
+from claude_translator.storage._io import atomic_write_text
 from claude_translator.storage.paths import ensure_translations_dir, get_cache_path
 
 logger = logging.getLogger(__name__)
@@ -37,7 +36,7 @@ def save_cache(lang: str, mapping: dict[str, str]) -> None:
     path = ensure_translations_dir() / f"cache-{lang}.json"
     try:
         data = {"_schema_version": CACHE_SCHEMA_VERSION, **mapping}
-        _atomic_write_text(path, json.dumps(data, ensure_ascii=False, indent=2) + "\n")
+        atomic_write_text(path, json.dumps(data, ensure_ascii=False, indent=2) + "\n")
     except OSError as e:
         raise FileSystemError(f"Cannot write to {path}: {e}") from e
 
@@ -46,15 +45,3 @@ def update_cache(lang: str, canonical_id: str, translation: str) -> None:
     cache = load_cache(lang)
     updated = {**cache, canonical_id: translation}
     save_cache(lang, updated)
-
-
-def _atomic_write_text(path: Path, content: str) -> None:
-    fd, temp_path = tempfile.mkstemp(dir=path.parent, prefix=f"{path.name}.", suffix=".tmp")
-    try:
-        with open(fd, "w", encoding="utf-8", newline="") as handle:
-            handle.write(content)
-        Path(temp_path).replace(path)
-    finally:
-        temp = Path(temp_path)
-        if temp.exists():
-            temp.unlink()

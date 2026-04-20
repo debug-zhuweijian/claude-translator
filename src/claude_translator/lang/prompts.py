@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from xml.sax.saxutils import escape
+
 _PROMPTS: dict[tuple[str, str], str] = {
     ("en", "zh-CN"): (
         "Translate the following text to Simplified Chinese. "
@@ -73,4 +75,4 @@ def get_prompt(source_lang: str, target_lang: str) -> str:
 
 def wrap_user_content(text: str) -> str:
     """Wrap user-supplied content in XML tags for prompt-injection isolation."""
-    return f"<text_to_translate>\n{text}\n</text_to_translate>"
+    return f"<text_to_translate>\n{escape(text)}\n</text_to_translate>"
