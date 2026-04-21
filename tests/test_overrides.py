@@ -68,7 +68,7 @@ def test_save_overrides_permission_error(tmp_path: Path, monkeypatch):
     td.mkdir()
     _patch_override_paths(monkeypatch, td)
     with patch(
-        "claude_translator.storage.overrides._atomic_write_text",
+        "claude_translator.storage.overrides.atomic_write_text",
         side_effect=PermissionError("denied"),
     ):
         with pytest.raises(FileSystemError, match="Cannot write"):
