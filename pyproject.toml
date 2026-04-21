@@ -7,11 +7,6 @@ name = "claude-translator"
 version = "0.3.0"
 description = "Multi-language plugin description translator for Claude Code"
 
-[project.urls]
-Homepage = "https://github.com/debug-zhuweijian/claude-translator"
-Repository = "https://github.com/debug-zhuweijian/claude-translator"
-Issues = "https://github.com/debug-zhuweijian/claude-translator/issues"
-
 requires-python = ">=3.10"
 dependencies = [
     "click>=8.0",
@@ -34,6 +29,11 @@ dev = [
 
 [project.scripts]
 claude-translator = "claude_translator.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/debug-zhuweijian/claude-translator"
+Repository = "https://github.com/debug-zhuweijian/claude-translator"
+Issues = "https://github.com/debug-zhuweijian/claude-translator/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/claude_translator"]

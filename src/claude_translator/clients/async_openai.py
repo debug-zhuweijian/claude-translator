@@ -18,8 +18,7 @@ class AsyncOpenAICompatClient:
         resolved_key = api_key or os.getenv("OPENAI_API_KEY", "")
         if not resolved_key:
             raise ValueError(
-                "OpenAI API key is required. "
-                "Set OPENAI_API_KEY env var or pass api_key in config."
+                "OpenAI API key is required. Set OPENAI_API_KEY env var or pass api_key in config."
             )
 
         self._model = model
