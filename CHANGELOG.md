@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-04-21
+
+### Added
+
+- **Shared atomic storage helper** -- introduced `storage._io.atomic_write_text` and regression tests for atomic write edge cases across cache, overrides, and legacy migration flows
+- **Broader client and language coverage** -- expanded sync/async OpenAI client tests and re-exported shared CJK helper functions from `lang.detect`
+- **Release-grade CI coverage** -- PR validation now runs on Python 3.10, 3.11, 3.12, and 3.13 with a 93% coverage gate, and `master` pushes now trigger the same CI workflow
+
+### Fixed
+
+- **Editable install metadata** -- moved `[project.urls]` after direct `project` fields so clean `pip install -e ".[dev]"` runs no longer fail metadata validation
+- **Atomic write consistency** -- cache, overrides, and legacy migration paths now use the same atomic writer instead of duplicating file-write logic
+
+### Security
+
+- **Prompt tag breakout hardening** -- XML meta characters in wrapped user text are escaped before sending content to the LLM, preventing user payloads from breaking out of `<text_to_translate>`
+
 ## [0.3.0] - 2026-04-19
 
 ### Added
@@ -68,6 +85,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Canonical ID system** -- `plugin.<key>.<kind>:<name>` / `user.<kind>:<name>`
 - **Immutable data models** -- frozen dataclasses throughout
 
+[0.4.0]: https://github.com/debug-zhuweijian/claude-translator/releases/tag/v0.4.0
 [0.2.0]: https://github.com/debug-zhuweijian/claude-translator/releases/tag/v0.2.0
 [0.3.0]: https://github.com/debug-zhuweijian/claude-translator/releases/tag/v0.3.0
 [0.1.2]: https://github.com/debug-zhuweijian/claude-translator/releases/tag/v0.1.2
