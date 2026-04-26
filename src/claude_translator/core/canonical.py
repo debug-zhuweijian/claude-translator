@@ -29,7 +29,7 @@ def parse_canonical_id(cid: str) -> tuple[str, str, str, str]:
     without_prefix = cid[7:]  # strip "plugin."
     if ":" not in without_prefix:
         raise ConfigError(f"Invalid plugin canonical ID: {cid!r}")
-    key_and_kind, name = without_prefix.rsplit(":", 1)
+    key_and_kind, name = without_prefix.split(":", 1)
     if "." not in key_and_kind:
         raise ConfigError(f"Invalid plugin canonical ID: {cid!r}")
     plugin_key, kind = key_and_kind.rsplit(".", 1)

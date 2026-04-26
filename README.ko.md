@@ -116,7 +116,7 @@ pip install .
 
 ```
 $ claude-translator --version
-claude-translator, version 0.2.0
+claude-translator, version 0.5.0
 ```
 
 ### 2. 초기화
@@ -130,12 +130,12 @@ Created config at C:\Users\you\.claude\translations\config.json (target: zh-CN)
 
 ### 3. 탐색
 
-번역 가능한 항목을 확인합니다. 사용자 수준 스킬/명령과 설치된 플러그인을 **모두** 스캔합니다:
+번역 가능한 항목을 확인합니다. 사용자 수준 스킬, 명령, 에이전트와 설치된 플러그인을 스캔합니다:
 
 ```
 $ claude-translator discover
 Scanning C:\Users\you\.claude ...
-Found 440 translatable items (target: zh-CN)
+Found <count> translatable items (target: zh-CN)
   ok [user] user.skill:academic-writing
   ok [user] user.skill:brainstorming
   ok [user] user.command:commit
@@ -156,7 +156,7 @@ Found 440 translatable items (target: zh-CN)
 ```
 $ claude-translator sync
 Scanning C:\Users\you\.claude ...
-Translating 440 items to zh-CN ...
+Translating <count> items to zh-CN ...
   [override] plugin.codex.agent:codex-rescue
   [cache] plugin.superpowers.skill:brainstorm
   [llm] plugin.compound-engineering.skill:code-review
@@ -179,7 +179,7 @@ sync 후 커버리지를 확인합니다:
 ```
 $ claude-translator verify
   MISSING: plugin.new-tool.skill:deploy
-Coverage: 439/440 (99.8%) -- 1 missing
+Coverage: <covered>/<count> (99.8%) -- 1 missing
 ```
 
 ---
@@ -208,7 +208,7 @@ Created config at C:\Users\you\.claude\translations\config.json (target: ko)
 ```
 C:\Users\you\claude-translator> claude-translator discover
 Scanning C:\Users\you\.claude ...
-Found 440 translatable items (target: ko)
+Found <count> translatable items (target: ko)
   ok [user] user.skill:academic-writing
   ok [user] user.command:commit
   ok [plugin] plugin.superpowers.skill:brainstorm
@@ -216,7 +216,7 @@ Found 440 translatable items (target: ko)
   ...
 ```
 
-사용자 스킬, 사용자 명령, 설치된 플러그인에 걸쳐 440개의 항목이 있습니다. `ok` 상태는 항목에 번역 준비가 된 `description` 필드가 있는 frontmatter가 있음을 의미합니다.
+항목 수는 로컬 Claude Code 설정에 따라 달라지며 사용자 스킬, 명령, 에이전트와 설치된 플러그인 엔트리포인트를 포함합니다. `ok` 상태는 항목에 번역 준비가 된 `description` 필드가 있는 frontmatter가 있음을 의미합니다.
 
 #### 3단계: LLM 설정
 
@@ -233,7 +233,7 @@ C:\Users\you\claude-translator> set CLAUDE_TRANSLATE_LLM_MODEL=qwen2.5:7b
 ```
 C:\Users\you\claude-translator> claude-translator sync
 Scanning C:\Users\you\.claude ...
-Translating 440 items to ko ...
+Translating <count> items to ko ...
   [llm] plugin.superpowers.skill:brainstorm
   [llm] plugin.superpowers.skill:tdd-guide
   [llm] plugin.compound-engineering.skill:code-review
@@ -271,7 +271,7 @@ C:\Users\you\claude-translator> claude-translator sync
 
 ```
 C:\Users\you\claude-translator> claude-translator verify
-Coverage: 440/440 (100.0%) -- 0 missing
+Coverage: <count>/<count> (100.0%) -- 0 missing
 ```
 
 모든 플러그인 설명이 한국어로 번역되었습니다. Claude Code는 번역된 설명을 즉시 사용합니다.
@@ -347,13 +347,14 @@ export CLAUDE_TRANSLATE_LLM_MODEL="Qwen/Qwen2.5-7B-Instruct"
 
 | 소스 | 경로 | 예시 |
 |------|------|------|
-| 사용자 스킬 | `~/.claude/skills/**/*.md` | `SKILL.md`, `my-skill.md` |
-| 사용자 명령 | `~/.claude/commands/**/*.md` | `commit.md`, `review.md` |
-| 플러그인 스킬 | `<plugin>/skills/**/*.md` | 플러그인별 스킬 정의 |
+| 사용자 스킬 | `~/.claude/skills/*.md` 및 `~/.claude/skills/**/SKILL.md` | `my-skill.md`, `team/tool/SKILL.md` |
+| 사용자 명령 | `~/.claude/commands/**/*.md` | `commit.md`, `gsd/add-backlog.md` |
+| 사용자 에이전트 | `~/.claude/agents/**/*.md` | `code-reviewer.md`, `review/security.md` |
+| 플러그인 스킬 | `<plugin>/skills/*.md` 및 `<plugin>/skills/**/SKILL.md` | 플러그인별 스킬 엔트리포인트 |
 | 플러그인 명령 | `<plugin>/commands/**/*.md` | 플러그인별 슬래시 명령 |
 | 플러그인 에이전트 | `<plugin>/agents/**/*.md` | 플러그인별 에이전트 정의 |
 
-플러그인 레지스트리는 `~/.claude/plugins/installed_plugins.json` (v2 형식)에서 읽으며, `~/.claude/installed_plugins.json` (v1 형식)으로 폴백합니다. 여러 버전의 플러그인은 중복 제거되며, 최신 버전만 번역됩니다.
+스킬 번들 내부의 지원 문서는 엔트리포인트 `SKILL.md`가 아닌 한 무시됩니다. 플러그인 레지스트리는 `~/.claude/plugins/installed_plugins.json` (v2 형식)에서 읽으며, `~/.claude/installed_plugins.json` (v1 형식)으로 폴백합니다. 여러 버전의 플러그인은 중복 제거되며, 최신 버전만 번역됩니다.
 
 ## 기능
 
@@ -376,7 +377,7 @@ export CLAUDE_TRANSLATE_LLM_MODEL="Qwen/Qwen2.5-7B-Instruct"
 | 명령 | 설명 |
 |------|------|
 | `init --lang LANG` | 대상 언어로 설정 생성 |
-| `discover [--lang LANG]` | 번역 가능한 항목 및 상태 나열 |
+| `discover [--lang LANG] [--audit]` | 번역 가능한 항목과 선택적 스캔 감사 요약 나열 |
 | `sync [--lang LANG] [--dry-run]` | 설명 번역 후 파일에 기록 |
 | `verify [--lang LANG]` | 커버리지 확인, 누락된 항목 보고 |
 
@@ -393,6 +394,8 @@ graph TB
     DISC --> |v1 폴백| V1["installed_plugins.json"]
     DISC --> |사용자 수준| USER["~/.claude/skills/"]
     DISC --> |사용자 수준| USERC["~/.claude/commands/"]
+    DISC --> |사용자 수준| USERA["~/.claude/agents/"]
+    DISC --> |감사| AUDIT["discover --audit"]
 
     TRANS --> |1순위| OV["overrides-{lang}.json"]
     TRANS --> |2순위| CACHE["cache-{lang}.json"]

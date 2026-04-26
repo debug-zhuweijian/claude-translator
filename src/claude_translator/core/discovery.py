@@ -1,4 +1,4 @@
-"""Auto-discover Claude Code plugins and user-level skills/commands."""
+"""Auto-discover Claude Code plugins and user-level skills, commands, and agents."""
 
 from __future__ import annotations
 
@@ -47,39 +47,11 @@ def _discover_user_level(claude_dir: Path) -> list[Record]:
     records: list[Record] = []
     parser = FrontmatterParser()
 
-    for dir_name, kind in [("skills", "skill"), ("commands", "command")]:
+    for dir_name, kind in [("skills", "skill"), ("commands", "command"), ("agents", "agent")]:
         base = claude_dir / dir_name
         if not base.is_dir():
             continue
-        for md_file in sorted(base.rglob("*.md")):
-            relative = md_file.relative_to(base)
-            parts = relative.parts
-            if len(parts) > 2:
-                continue
-            if len(parts) == 2 and parts[1] != "SKILL.md":
-                continue
-
-            if len(parts) == 2 and parts[1] == "SKILL.md":
-                name = parts[0]
-            else:
-                name = name_from_filename(parts[0])
-
-            cid = generate_canonical_id(kind=kind, name=name, scope="user")
-            content = md_file.read_text(encoding="utf-8")
-            fm, _ = parser.parse(content)
-            desc = parser.get_description(fm) or ""
-
-            records.append(
-                Record(
-                    canonical_id=cid,
-                    kind=kind,
-                    scope="user",
-                    source_path=str(md_file),
-                    relative_path=normalize_path(str(relative)),
-                    current_description=desc,
-                    frontmatter_present=bool(fm),
-                )
-            )
+        records.extend(_scan_root(base, kind=kind, scope="user", plugin_key="", parser=parser))
 
     return records
 
@@ -169,37 +141,63 @@ def _scan_plugin_dir(plugin_dir: Path, plugin_key: str, parser: FrontmatterParse
         target_dir = plugin_dir / dir_name
         if not target_dir.is_dir():
             continue
-
-        for md_file in sorted(target_dir.rglob("*.md")):
-            relative = md_file.relative_to(target_dir)
-            parts = relative.parts
-
-            if len(parts) > 2:
-                continue
-            if len(parts) == 2 and parts[1] != "SKILL.md":
-                continue
-
-            if len(parts) == 2 and parts[1] == "SKILL.md":
-                name = parts[0]
-            else:
-                name = name_from_filename(parts[0])
-
-            cid = generate_canonical_id(kind=kind, name=name, scope="plugin", plugin_key=plugin_key)
-            content = md_file.read_text(encoding="utf-8")
-            fm, _ = parser.parse(content)
-            desc = parser.get_description(fm) or ""
-
-            records.append(
-                Record(
-                    canonical_id=cid,
-                    kind=kind,
-                    scope="plugin",
-                    source_path=str(md_file),
-                    relative_path=normalize_path(str(relative)),
-                    plugin_key=plugin_key,
-                    current_description=desc,
-                    frontmatter_present=bool(fm),
-                )
-            )
+        records.extend(
+            _scan_root(target_dir, kind=kind, scope="plugin", plugin_key=plugin_key, parser=parser)
+        )
 
     return records
+
+
+def _scan_root(
+    root: Path,
+    *,
+    kind: str,
+    scope: str,
+    plugin_key: str,
+    parser: FrontmatterParser,
+) -> list[Record]:
+    records: list[Record] = []
+
+    for md_file in sorted(root.rglob("*.md")):
+        relative = md_file.relative_to(root)
+        name = _name_from_entrypoint(relative, kind)
+        if name is None:
+            continue
+
+        cid = generate_canonical_id(kind=kind, name=name, scope=scope, plugin_key=plugin_key)
+        content = md_file.read_text(encoding="utf-8")
+        fm, _ = parser.parse(content)
+        desc = parser.get_description(fm) or ""
+
+        records.append(
+            Record(
+                canonical_id=cid,
+                kind=kind,
+                scope=scope,
+                source_path=str(md_file),
+                relative_path=normalize_path(str(relative)),
+                plugin_key=plugin_key,
+                current_description=desc,
+                frontmatter_present=bool(fm),
+            )
+        )
+
+    return records
+
+
+def _name_from_entrypoint(relative: Path, kind: str) -> str | None:
+    parts = relative.parts
+    if not parts:
+        return None
+
+    if kind == "skill":
+        if len(parts) == 1:
+            return name_from_filename(parts[0])
+        if parts[-1] == "SKILL.md":
+            return ":".join(parts[:-1])
+        return None
+
+    if kind in {"command", "agent"}:
+        return ":".join((*parts[:-1], name_from_filename(parts[-1])))
+
+    return None

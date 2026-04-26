@@ -116,7 +116,7 @@ pip install .
 
 ```
 $ claude-translator --version
-claude-translator, version 0.2.0
+claude-translator, version 0.5.0
 ```
 
 ### 2. 初期化
@@ -130,12 +130,12 @@ Created config at C:\Users\you\.claude\translations\config.json (target: zh-CN)
 
 ### 3. 検出
 
-翻訳可能なアイテムを確認します。ユーザーレベルのスキル/コマンドとインストール済みプラグインの**両方**をスキャンします:
+翻訳可能なアイテムを確認します。ユーザーレベルのスキル、コマンド、エージェントとインストール済みプラグインをスキャンします:
 
 ```
 $ claude-translator discover
 Scanning C:\Users\you\.claude ...
-Found 440 translatable items (target: zh-CN)
+Found <count> translatable items (target: zh-CN)
   ok [user] user.skill:academic-writing
   ok [user] user.skill:brainstorming
   ok [user] user.command:commit
@@ -156,7 +156,7 @@ Found 440 translatable items (target: zh-CN)
 ```
 $ claude-translator sync
 Scanning C:\Users\you\.claude ...
-Translating 440 items to zh-CN ...
+Translating <count> items to zh-CN ...
   [override] plugin.codex.agent:codex-rescue
   [cache] plugin.superpowers.skill:brainstorm
   [llm] plugin.compound-engineering.skill:code-review
@@ -179,7 +179,7 @@ Sync complete.
 ```
 $ claude-translator verify
   MISSING: plugin.new-tool.skill:deploy
-Coverage: 439/440 (99.8%) -- 1 missing
+Coverage: <covered>/<count> (99.8%) -- 1 missing
 ```
 
 ---
@@ -208,7 +208,7 @@ Created config at C:\Users\you\.claude\translations\config.json (target: zh-CN)
 ```
 C:\Users\you\claude-translator> claude-translator discover
 Scanning C:\Users\you\.claude ...
-Found 440 translatable items (target: zh-CN)
+Found <count> translatable items (target: zh-CN)
   ok [user] user.skill:academic-writing
   ok [user] user.command:commit
   ok [plugin] plugin.superpowers.skill:brainstorm
@@ -216,7 +216,7 @@ Found 440 translatable items (target: zh-CN)
   ...
 ```
 
-ユーザースキル、ユーザーコマンド、インストール済みプラグインにわたる 440 アイテム。`ok` ステータスは、そのアイテムに翻訳対象の `description` フィールドを含むフロントマターがあることを示します。
+アイテム数はローカルの Claude Code 設定によって変わり、ユーザースキル、コマンド、エージェント、インストール済みプラグインのエントリポイントを含みます。`ok` ステータスは、そのアイテムに翻訳対象の `description` フィールドを含むフロントマターがあることを示します。
 
 #### ステップ 3: LLM を設定
 
@@ -233,7 +233,7 @@ C:\Users\you\claude-translator> set CLAUDE_TRANSLATE_LLM_MODEL=qwen2.5:7b
 ```
 C:\Users\you\claude-translator> claude-translator sync
 Scanning C:\Users\you\.claude ...
-Translating 440 items to zh-CN ...
+Translating <count> items to zh-CN ...
   [llm] plugin.superpowers.skill:brainstorm
   [llm] plugin.superpowers.skill:tdd-guide
   [llm] plugin.compound-engineering.skill:code-review
@@ -271,7 +271,7 @@ C:\Users\you\claude-translator> claude-translator sync
 
 ```
 C:\Users\you\claude-translator> claude-translator verify
-Coverage: 440/440 (100.0%) -- 0 missing
+Coverage: <count>/<count> (100.0%) -- 0 missing
 ```
 
 すべてのプラグイン説明が中国語になりました。Claude Code は翻訳された説明を即座に使用します。
@@ -347,13 +347,14 @@ export CLAUDE_TRANSLATE_LLM_MODEL="Qwen/Qwen2.5-7B-Instruct"
 
 | ソース | パス | 例 |
 |--------|------|----------|
-| ユーザースキル | `~/.claude/skills/**/*.md` | `SKILL.md`、`my-skill.md` |
-| ユーザーコマンド | `~/.claude/commands/**/*.md` | `commit.md`、`review.md` |
-| プラグインスキル | `<plugin>/skills/**/*.md` | プラグインごとのスキル定義 |
+| ユーザースキル | `~/.claude/skills/*.md` と `~/.claude/skills/**/SKILL.md` | `my-skill.md`、`team/tool/SKILL.md` |
+| ユーザーコマンド | `~/.claude/commands/**/*.md` | `commit.md`、`gsd/add-backlog.md` |
+| ユーザーエージェント | `~/.claude/agents/**/*.md` | `code-reviewer.md`、`review/security.md` |
+| プラグインスキル | `<plugin>/skills/*.md` と `<plugin>/skills/**/SKILL.md` | プラグインごとのスキル入口 |
 | プラグインコマンド | `<plugin>/commands/**/*.md` | プラグインごとのスラッシュコマンド |
 | プラグインエージェント | `<plugin>/agents/**/*.md` | プラグインごとのエージェント定義 |
 
-プラグインレジストリは `~/.claude/plugins/installed_plugins.json`（v2 形式）から読み込まれ、`~/.claude/installed_plugins.json`（v1 形式）にフォールバックします。複数バージョンのプラグインは重複排除され、最新バージョンのみが翻訳されます。
+スキルバンドル内の補助ドキュメントは、入口ファイル `SKILL.md` でない限り無視されます。プラグインレジストリは `~/.claude/plugins/installed_plugins.json`（v2 形式）から読み込まれ、`~/.claude/installed_plugins.json`（v1 形式）にフォールバックします。複数バージョンのプラグインは重複排除され、最新バージョンのみが翻訳されます。
 
 ## 機能一覧
 
@@ -376,7 +377,7 @@ export CLAUDE_TRANSLATE_LLM_MODEL="Qwen/Qwen2.5-7B-Instruct"
 | コマンド | 説明 |
 |---------|-------------|
 | `init --lang LANG` | ターゲット言語を設定して config を作成 |
-| `discover [--lang LANG]` | 翻訳可能なアイテムとステータスを一覧表示 |
+| `discover [--lang LANG] [--audit]` | 翻訳可能なアイテムと任意のスキャン監査サマリーを一覧表示 |
 | `sync [--lang LANG] [--dry-run]` | 説明を翻訳してファイルに書き込み |
 | `verify [--lang LANG]` | カバレッジを確認し、未翻訳アイテムを報告 |
 
@@ -393,6 +394,8 @@ graph TB
     DISC --> |v1 フォールバック| V1["installed_plugins.json"]
     DISC --> |ユーザーレベル| USER["~/.claude/skills/"]
     DISC --> |ユーザーレベル| USERC["~/.claude/commands/"]
+    DISC --> |ユーザーレベル| USERA["~/.claude/agents/"]
+    DISC --> |監査| AUDIT["discover --audit"]
 
     TRANS --> |第1優先| OV["overrides-{lang}.json"]
     TRANS --> |第2優先| CACHE["cache-{lang}.json"]

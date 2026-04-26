@@ -116,7 +116,7 @@ Verify:
 
 ```
 $ claude-translator --version
-claude-translator, version 0.2.0
+claude-translator, version 0.5.0
 ```
 
 ### 2. Initialize
@@ -130,12 +130,12 @@ Created config at C:\Users\you\.claude\translations\config.json (target: zh-CN)
 
 ### 3. Discover
 
-See what can be translated. This scans **both** user-level skills/commands and installed plugins:
+See what can be translated. This scans user-level skills, commands, agents, and installed plugins:
 
 ```
 $ claude-translator discover
 Scanning C:\Users\you\.claude ...
-Found 440 translatable items (target: zh-CN)
+Found <count> translatable items (target: zh-CN)
   ok [user] user.skill:academic-writing
   ok [user] user.skill:brainstorming
   ok [user] user.command:commit
@@ -156,7 +156,7 @@ Run the translation. It uses a 4-level fallback per item:
 ```
 $ claude-translator sync
 Scanning C:\Users\you\.claude ...
-Translating 440 items to zh-CN ...
+Translating <count> items to zh-CN ...
   [override] plugin.codex.agent:codex-rescue
   [cache] plugin.superpowers.skill:brainstorm
   [llm] plugin.compound-engineering.skill:code-review
@@ -179,7 +179,7 @@ Check coverage after sync:
 ```
 $ claude-translator verify
   MISSING: plugin.new-tool.skill:deploy
-Coverage: 439/440 (99.8%) -- 1 missing
+Coverage: <covered>/<count> (99.8%) -- 1 missing
 ```
 
 ---
@@ -208,7 +208,7 @@ The config file tells claude-translator your target language. You only run `init
 ```
 C:\Users\you\claude-translator> claude-translator discover
 Scanning C:\Users\you\.claude ...
-Found 440 translatable items (target: zh-CN)
+Found <count> translatable items (target: zh-CN)
   ok [user] user.skill:academic-writing
   ok [user] user.command:commit
   ok [plugin] plugin.superpowers.skill:brainstorm
@@ -216,7 +216,7 @@ Found 440 translatable items (target: zh-CN)
   ...
 ```
 
-440 items across user skills, user commands, and installed plugins. The `ok` status means the item has a frontmatter with a `description` field ready for translation.
+The count depends on your local Claude Code setup and includes user skills, commands, agents, and installed plugin entrypoints. The `ok` status means the item has a frontmatter with a `description` field ready for translation.
 
 #### Step 3: Configure Your LLM
 
@@ -233,7 +233,7 @@ C:\Users\you\claude-translator> set CLAUDE_TRANSLATE_LLM_MODEL=qwen2.5:7b
 ```
 C:\Users\you\claude-translator> claude-translator sync
 Scanning C:\Users\you\.claude ...
-Translating 440 items to zh-CN ...
+Translating <count> items to zh-CN ...
   [llm] plugin.superpowers.skill:brainstorm
   [llm] plugin.superpowers.skill:tdd-guide
   [llm] plugin.compound-engineering.skill:code-review
@@ -271,7 +271,7 @@ Your override takes priority. It will never be overwritten by future syncs.
 
 ```
 C:\Users\you\claude-translator> claude-translator verify
-Coverage: 440/440 (100.0%) -- 0 missing
+Coverage: <count>/<count> (100.0%) -- 0 missing
 ```
 
 All plugin descriptions are now in Chinese. Claude Code will use the translated descriptions immediately.
@@ -369,13 +369,14 @@ Overrides always win -- they're never overwritten by `sync`.
 
 | Source | Path | Examples |
 |--------|------|----------|
-| User skills | `~/.claude/skills/**/*.md` | `SKILL.md`, `my-skill.md` |
-| User commands | `~/.claude/commands/**/*.md` | `commit.md`, `review.md` |
-| Plugin skills | `<plugin>/skills/**/*.md` | Per-plugin skill definitions |
+| User skills | `~/.claude/skills/*.md` and `~/.claude/skills/**/SKILL.md` | `my-skill.md`, `team/tool/SKILL.md` |
+| User commands | `~/.claude/commands/**/*.md` | `commit.md`, `gsd/add-backlog.md` |
+| User agents | `~/.claude/agents/**/*.md` | `code-reviewer.md`, `review/security.md` |
+| Plugin skills | `<plugin>/skills/*.md` and `<plugin>/skills/**/SKILL.md` | Per-plugin skill entrypoints |
 | Plugin commands | `<plugin>/commands/**/*.md` | Per-plugin slash commands |
 | Plugin agents | `<plugin>/agents/**/*.md` | Per-plugin agent definitions |
 
-Plugin registry is read from `~/.claude/plugins/installed_plugins.json` (v2 format) with fallback to `~/.claude/installed_plugins.json` (v1 format). Multi-version plugins are deduplicated -- only the latest version is translated.
+Skill support documents under a skill bundle are ignored unless they are the entrypoint `SKILL.md`. Plugin registry is read from `~/.claude/plugins/installed_plugins.json` (v2 format) with fallback to `~/.claude/installed_plugins.json` (v1 format). Multi-version plugins are deduplicated -- only the latest version is translated.
 
 ## Features
 
@@ -398,7 +399,7 @@ Plugin registry is read from `~/.claude/plugins/installed_plugins.json` (v2 form
 | Command | Description |
 |---------|-------------|
 | `init --lang LANG` | Create config with target language |
-| `discover [--lang LANG]` | List translatable items and status |
+| `discover [--lang LANG] [--audit]` | List translatable items and optional scan audit summary |
 | `sync [--lang LANG] [--dry-run]` | Translate descriptions and write to files |
 | `verify [--lang LANG]` | Check coverage, report missing items |
 
@@ -415,6 +416,8 @@ graph TB
     DISC --> |v1 fallback| V1["installed_plugins.json"]
     DISC --> |user-level| USER["~/.claude/skills/"]
     DISC --> |user-level| USERC["~/.claude/commands/"]
+    DISC --> |user-level| USERA["~/.claude/agents/"]
+    DISC --> |audit| AUDIT["discover --audit"]
 
     TRANS --> |1st| OV["overrides-{lang}.json"]
     TRANS --> |2nd| CACHE["cache-{lang}.json"]

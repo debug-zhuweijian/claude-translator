@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-04-27
+
+### Added
+
+- **Recursive entrypoint discovery** -- user agents, nested commands, and nested skill bundle `SKILL.md` files are now discovered for complex Claude Code configurations
+- **Plugin nested entry discovery** -- plugin commands, agents, and skill bundles now support recursive entrypoints while preserving latest-version registry deduplication
+- **Discovery audit mode** -- `discover --audit` summarizes scope/kind counts, dogfooding categories, missing frontmatter, and empty descriptions
+
+### Fixed
+
+- **Namespaced canonical IDs** -- canonical ID parsing now supports command and agent names containing namespace colons such as `gsd:add-backlog` and `ce:brainstorm`
+
 ## [0.4.0] - 2026-04-21
 
 ### Added
@@ -85,6 +97,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Canonical ID system** -- `plugin.<key>.<kind>:<name>` / `user.<kind>:<name>`
 - **Immutable data models** -- frozen dataclasses throughout
 
+[0.5.0]: https://github.com/debug-zhuweijian/claude-translator/releases/tag/v0.5.0
 [0.4.0]: https://github.com/debug-zhuweijian/claude-translator/releases/tag/v0.4.0
 [0.2.0]: https://github.com/debug-zhuweijian/claude-translator/releases/tag/v0.2.0
 [0.3.0]: https://github.com/debug-zhuweijian/claude-translator/releases/tag/v0.3.0

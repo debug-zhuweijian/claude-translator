@@ -175,6 +175,128 @@ def test_discover_lists_records(tmp_path: Path, monkeypatch):
     assert "no [plugin] plugin.demo.skill:draft" in result.output
 
 
+def test_discover_audit_summarizes_inventory(tmp_path: Path, monkeypatch):
+    agent = Record(
+        canonical_id="user.agent:backend-architect",
+        kind="agent",
+        scope="user",
+        source_path=str(tmp_path / "backend-architect.md"),
+        relative_path="agents/backend-architect.md",
+        current_description="Design backend systems",
+        frontmatter_present=True,
+    )
+    gsd_command = Record(
+        canonical_id="user.command:gsd:add-backlog",
+        kind="command",
+        scope="user",
+        source_path=str(tmp_path / "add-backlog.md"),
+        relative_path="commands/gsd/add-backlog.md",
+        current_description="Add backlog",
+        frontmatter_present=True,
+    )
+    composio_skill = Record(
+        canonical_id="user.skill:composio-skills:-21risk-automation",
+        kind="skill",
+        scope="user",
+        source_path=str(tmp_path / "SKILL.md"),
+        relative_path="composio-skills/-21risk-automation/SKILL.md",
+        current_description="21Risk automation",
+        frontmatter_present=True,
+    )
+    empty_description = Record(
+        canonical_id="plugin.demo.skill:empty",
+        kind="skill",
+        scope="plugin",
+        source_path=str(tmp_path / "empty.md"),
+        relative_path="skills/empty/SKILL.md",
+        plugin_key="demo",
+        current_description="",
+        frontmatter_present=True,
+    )
+    missing_frontmatter = Record(
+        canonical_id="plugin.demo.skill:no-frontmatter",
+        kind="skill",
+        scope="plugin",
+        source_path=str(tmp_path / "no-frontmatter.md"),
+        relative_path="skills/no-frontmatter/SKILL.md",
+        plugin_key="demo",
+        current_description="No frontmatter",
+        frontmatter_present=False,
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "discover_all",
+        lambda _: Inventory(
+            (agent, gsd_command, composio_skill, empty_description, missing_frontmatter)
+        ),
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["discover", "--audit"])
+
+    assert result.exit_code == 0, result.output
+    assert "Audit summary" in result.output
+    assert "total: 5" in result.output
+    assert "user.agent: 1" in result.output
+    assert "plugin.skill: 2" in result.output
+    assert "user agents: 1" in result.output
+    assert "user.command:gsd:*: 1" in result.output
+    assert "skills/composio-skills: 1" in result.output
+    assert "missing frontmatter: 1" in result.output
+    assert "empty descriptions: 1" in result.output
+    assert "plugin.demo.skill:no-frontmatter" in result.output
+    assert "plugin.demo.skill:empty" in result.output
+
+
+def test_discover_audit_does_not_count_missing_frontmatter_as_empty_description(
+    tmp_path: Path, monkeypatch
+):
+    missing_frontmatter = Record(
+        canonical_id="plugin.demo.skill:no-frontmatter",
+        kind="skill",
+        scope="plugin",
+        source_path=str(tmp_path / "no-frontmatter.md"),
+        relative_path="no-frontmatter.md",
+        plugin_key="demo",
+        current_description="",
+        frontmatter_present=False,
+    )
+    monkeypatch.setattr(
+        cli_module,
+        "discover_all",
+        lambda _: Inventory((missing_frontmatter,)),
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["discover", "--audit"])
+
+    assert result.exit_code == 0, result.output
+    assert "missing frontmatter: 1" in result.output
+    assert "empty descriptions: 0" in result.output
+
+
+def test_discover_audit_uses_real_discovery_paths(tmp_path: Path):
+    claude_dir = tmp_path / ".claude"
+    skill_dir = claude_dir / "skills" / "composio-skills" / "-21risk-automation"
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "SKILL.md").write_text(
+        "---\ndescription: 21Risk automation\n---\n# Body\n",
+        encoding="utf-8",
+    )
+    command_dir = claude_dir / "commands"
+    command_dir.mkdir(parents=True)
+    (command_dir / "missing.md").write_text("# Body\n", encoding="utf-8")
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["discover", "--audit"])
+
+    assert result.exit_code == 0, result.output
+    assert "Found 2 translatable items" in result.output
+    assert "skills/composio-skills: 1" in result.output
+    assert "missing frontmatter: 1" in result.output
+    assert "empty descriptions: 0" in result.output
+
+
 def test_sync_exits_early_when_inventory_is_empty(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(cli_module, "discover_all", lambda _: Inventory(()))
     save_calls: list[tuple[str, dict[str, str]]] = []

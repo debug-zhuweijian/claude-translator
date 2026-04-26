@@ -116,7 +116,7 @@ pip install .
 
 ```
 $ claude-translator --version
-claude-translator, version 0.2.0
+claude-translator, version 0.5.0
 ```
 
 ### 2. 初始化
@@ -130,12 +130,12 @@ Created config at C:\Users\you\.claude\translations\config.json (target: zh-CN)
 
 ### 3. 发现
 
-查看哪些内容可以被翻译。此命令扫描用户级 skill/command 和已安装的插件：
+查看哪些内容可以被翻译。此命令扫描用户级 skill、command、agent 和已安装的插件：
 
 ```
 $ claude-translator discover
 Scanning C:\Users\you\.claude ...
-Found 440 translatable items (target: zh-CN)
+Found <count> translatable items (target: zh-CN)
   ok [user] user.skill:academic-writing
   ok [user] user.skill:brainstorming
   ok [user] user.command:commit
@@ -156,7 +156,7 @@ Found 440 translatable items (target: zh-CN)
 ```
 $ claude-translator sync
 Scanning C:\Users\you\.claude ...
-Translating 440 items to zh-CN ...
+Translating <count> items to zh-CN ...
   [override] plugin.codex.agent:codex-rescue
   [cache] plugin.superpowers.skill:brainstorm
   [llm] plugin.compound-engineering.skill:code-review
@@ -179,7 +179,7 @@ Sync complete.
 ```
 $ claude-translator verify
   MISSING: plugin.new-tool.skill:deploy
-Coverage: 439/440 (99.8%) -- 1 missing
+Coverage: <covered>/<count> (99.8%) -- 1 missing
 ```
 
 ---
@@ -208,7 +208,7 @@ Created config at C:\Users\you\.claude\translations\config.json (target: zh-CN)
 ```
 C:\Users\you\claude-translator> claude-translator discover
 Scanning C:\Users\you\.claude ...
-Found 440 translatable items (target: zh-CN)
+Found <count> translatable items (target: zh-CN)
   ok [user] user.skill:academic-writing
   ok [user] user.command:commit
   ok [plugin] plugin.superpowers.skill:brainstorm
@@ -216,7 +216,7 @@ Found 440 translatable items (target: zh-CN)
   ...
 ```
 
-共 440 个条目，涵盖用户 skill、用户 command 和已安装插件。`ok` 状态表示该条目有包含 `description` 字段的 frontmatter，已准备好进行翻译。
+条目数量取决于你的本机 Claude Code 配置，涵盖用户 skill、command、agent 和已安装插件入口。`ok` 状态表示该条目有包含 `description` 字段的 frontmatter，已准备好进行翻译。
 
 #### 第 3 步：配置 LLM
 
@@ -233,7 +233,7 @@ C:\Users\you\claude-translator> set CLAUDE_TRANSLATE_LLM_MODEL=qwen2.5:7b
 ```
 C:\Users\you\claude-translator> claude-translator sync
 Scanning C:\Users\you\.claude ...
-Translating 440 items to zh-CN ...
+Translating <count> items to zh-CN ...
   [llm] plugin.superpowers.skill:brainstorm
   [llm] plugin.superpowers.skill:tdd-guide
   [llm] plugin.compound-engineering.skill:code-review
@@ -271,7 +271,7 @@ C:\Users\you\claude-translator> claude-translator sync
 
 ```
 C:\Users\you\claude-translator> claude-translator verify
-Coverage: 440/440 (100.0%) -- 0 missing
+Coverage: <count>/<count> (100.0%) -- 0 missing
 ```
 
 所有插件描述现在都是中文。Claude Code 将立即使用翻译后的描述。
@@ -347,13 +347,14 @@ export CLAUDE_TRANSLATE_LLM_MODEL="Qwen/Qwen2.5-7B-Instruct"
 
 | 来源 | 路径 | 示例 |
 |------|------|------|
-| 用户 skill | `~/.claude/skills/**/*.md` | `SKILL.md`、`my-skill.md` |
-| 用户 command | `~/.claude/commands/**/*.md` | `commit.md`、`review.md` |
-| 插件 skill | `<plugin>/skills/**/*.md` | 各插件的 skill 定义 |
+| 用户 skill | `~/.claude/skills/*.md` 和 `~/.claude/skills/**/SKILL.md` | `my-skill.md`、`team/tool/SKILL.md` |
+| 用户 command | `~/.claude/commands/**/*.md` | `commit.md`、`gsd/add-backlog.md` |
+| 用户 agent | `~/.claude/agents/**/*.md` | `code-reviewer.md`、`review/security.md` |
+| 插件 skill | `<plugin>/skills/*.md` 和 `<plugin>/skills/**/SKILL.md` | 各插件的 skill 入口 |
 | 插件 command | `<plugin>/commands/**/*.md` | 各插件的斜杠命令 |
 | 插件 agent | `<plugin>/agents/**/*.md` | 各插件的 agent 定义 |
 
-插件注册表从 `~/.claude/plugins/installed_plugins.json`（v2 格式）读取，回退到 `~/.claude/installed_plugins.json`（v1 格式）。多版本插件会自动去重——只翻译最新版本。
+skill bundle 内部的支持文档会被忽略，除非它是入口文件 `SKILL.md`。插件注册表从 `~/.claude/plugins/installed_plugins.json`（v2 格式）读取，回退到 `~/.claude/installed_plugins.json`（v1 格式）。多版本插件会自动去重——只翻译最新版本。
 
 ## 功能特性
 
@@ -376,7 +377,7 @@ export CLAUDE_TRANSLATE_LLM_MODEL="Qwen/Qwen2.5-7B-Instruct"
 | 命令 | 说明 |
 |------|------|
 | `init --lang LANG` | 创建配置并设置目标语言 |
-| `discover [--lang LANG]` | 列出可翻译条目及其状态 |
+| `discover [--lang LANG] [--audit]` | 列出可翻译条目及可选扫描审计摘要 |
 | `sync [--lang LANG] [--dry-run]` | 翻译描述并写入文件 |
 | `verify [--lang LANG]` | 检查覆盖率，报告遗漏条目 |
 
@@ -393,6 +394,8 @@ graph TB
     DISC --> |v1 回退| V1["installed_plugins.json"]
     DISC --> |用户级| USER["~/.claude/skills/"]
     DISC --> |用户级| USERC["~/.claude/commands/"]
+    DISC --> |用户级| USERA["~/.claude/agents/"]
+    DISC --> |审计| AUDIT["discover --audit"]
 
     TRANS --> |第 1 优先| OV["overrides-{lang}.json"]
     TRANS --> |第 2 优先| CACHE["cache-{lang}.json"]

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import sys
+from collections import Counter
 from pathlib import Path
 
 import click
@@ -16,6 +17,7 @@ from claude_translator.config.loaders import load_config
 from claude_translator.core.discovery import discover_all
 from claude_translator.core.frontmatter import FrontmatterParser
 from claude_translator.core.migration import migrate_legacy
+from claude_translator.core.models import Inventory
 from claude_translator.core.pipeline import run_async, run_sync, script_tag_for_lang
 from claude_translator.core.translator import TranslationChain
 from claude_translator.lang.detect import detect_script
@@ -49,7 +51,8 @@ def main(verbose: int, quiet: int) -> None:
 
 @main.command()
 @click.option("--lang", default=None, help="Target language (e.g. zh-CN, ja, ko)")
-def discover(lang: str | None) -> None:
+@click.option("--audit", is_flag=True, default=False, help="Show discovery audit summary")
+def discover(lang: str | None, audit: bool) -> None:
     """Discover all translatable plugin descriptions."""
     config = load_config(config_path=get_config_path(), target_lang=lang)
     claude_dir = get_claude_dir()
@@ -61,6 +64,45 @@ def discover(lang: str | None) -> None:
     for record in inventory.records:
         status = "ok" if record.frontmatter_present else "no"
         click.echo(f"  {status} [{record.scope}] {record.canonical_id}")
+
+    if audit:
+        _print_discovery_audit(inventory)
+
+
+def _print_discovery_audit(inventory: Inventory) -> None:
+    scope_kind_counts = Counter((record.scope, record.kind) for record in inventory.records)
+    user_agents = sum(record.canonical_id.startswith("user.agent:") for record in inventory.records)
+    gsd_commands = sum(
+        record.canonical_id.startswith("user.command:gsd:") for record in inventory.records
+    )
+    composio_skills = sum(
+        record.kind == "skill"
+        and (
+            record.relative_path.startswith("composio-skills/")
+            or "skills/composio-skills/" in record.relative_path
+        )
+        for record in inventory.records
+    )
+    missing_frontmatter = [record for record in inventory.records if not record.frontmatter_present]
+    empty_descriptions = [
+        record
+        for record in inventory.records
+        if record.frontmatter_present and not record.current_description
+    ]
+
+    click.echo("Audit summary")
+    click.echo(f"  total: {inventory.size()}")
+    for scope, kind in sorted(scope_kind_counts):
+        click.echo(f"  {scope}.{kind}: {scope_kind_counts[(scope, kind)]}")
+    click.echo(f"  user agents: {user_agents}")
+    click.echo(f"  user.command:gsd:*: {gsd_commands}")
+    click.echo(f"  skills/composio-skills: {composio_skills}")
+    click.echo(f"  missing frontmatter: {len(missing_frontmatter)}")
+    for record in missing_frontmatter[:5]:
+        click.echo(f"    {record.canonical_id}")
+    click.echo(f"  empty descriptions: {len(empty_descriptions)}")
+    for record in empty_descriptions[:5]:
+        click.echo(f"    {record.canonical_id}")
 
 
 @main.command()

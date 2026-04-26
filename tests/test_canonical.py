@@ -51,6 +51,20 @@ def test_roundtrip_deeply_nested_plugin_key():
     assert (scope, pk, kind, name) == ("plugin", "compound-engineering.context7", "skill", "bar")
 
 
+def test_roundtrip_user_namespaced_command():
+    cid = generate_canonical_id("command", "gsd:add-backlog", "user")
+    assert cid == "user.command:gsd:add-backlog"
+    scope, pk, kind, name = parse_canonical_id(cid)
+    assert (scope, pk, kind, name) == ("user", "", "command", "gsd:add-backlog")
+
+
+def test_roundtrip_plugin_namespaced_command():
+    cid = generate_canonical_id("command", "ce:brainstorm", "plugin", "compound-engineering")
+    assert cid == "plugin.compound-engineering.command:ce:brainstorm"
+    scope, pk, kind, name = parse_canonical_id(cid)
+    assert (scope, pk, kind, name) == ("plugin", "compound-engineering", "command", "ce:brainstorm")
+
+
 def test_name_from_filename():
     assert name_from_filename("brainstorm.md") == "brainstorm"
     assert name_from_filename("SKILL.md") == "SKILL"

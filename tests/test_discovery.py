@@ -90,6 +90,68 @@ def test_discover_user_scope(tmp_path: Path):
     assert "user.command:review" in ids
 
 
+def test_discover_user_agents(tmp_path: Path):
+    claude_dir = tmp_path / ".claude"
+    agents = claude_dir / "agents"
+    agents.mkdir(parents=True)
+    (agents / "code-simplifier.md").write_text(
+        "---\ndescription: Simplify code\n---\n# Code Simplifier\n"
+    )
+
+    inv = discover_all(claude_dir)
+
+    assert {r.canonical_id for r in inv.records} == {"user.agent:code-simplifier"}
+
+
+def test_discover_nested_user_commands(tmp_path: Path):
+    claude_dir = tmp_path / ".claude"
+    command = claude_dir / "commands" / "gsd"
+    command.mkdir(parents=True)
+    (command / "add-backlog.md").write_text(
+        "---\ndescription: Add backlog item\n---\n# Add Backlog\n"
+    )
+
+    inv = discover_all(claude_dir)
+
+    assert {r.canonical_id for r in inv.records} == {"user.command:gsd:add-backlog"}
+
+
+def test_discover_nested_user_skill_bundles(tmp_path: Path):
+    claude_dir = tmp_path / ".claude"
+    skill = claude_dir / "skills" / "composio-skills" / "-21risk-automation"
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_text("---\ndescription: 21Risk automation\n---\n# 21Risk\n")
+
+    inv = discover_all(claude_dir)
+
+    assert {r.canonical_id for r in inv.records} == {
+        "user.skill:composio-skills:-21risk-automation"
+    }
+
+
+def test_discover_nested_plugin_entries(tmp_path: Path):
+    claude_dir = tmp_path / ".claude"
+    plugin_dir = tmp_path / "cache" / "market" / "my-plugin" / "1.0.0"
+    command = plugin_dir / "commands" / "ce"
+    command.mkdir(parents=True)
+    (command / "brainstorm.md").write_text("---\ndescription: Brainstorm\n---\n# Brainstorm\n")
+    agent = plugin_dir / "agents" / "review"
+    agent.mkdir(parents=True)
+    (agent / "security.md").write_text("---\ndescription: Security review\n---\n# Security\n")
+    skill = plugin_dir / "skills" / "composio-skills" / "tool-a"
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_text("---\ndescription: Tool A\n---\n# Tool A\n")
+
+    _write_plugins_json(claude_dir, [{"installation_path": str(plugin_dir)}])
+    inv = discover_all(claude_dir)
+
+    assert {r.canonical_id for r in inv.records} == {
+        "plugin.my-plugin.command:ce:brainstorm",
+        "plugin.my-plugin.agent:review:security",
+        "plugin.my-plugin.skill:composio-skills:tool-a",
+    }
+
+
 def test_discover_multi_version_dedup(tmp_path: Path):
     """T17: Same plugin at 1.0.0 and 2.0.0 — only latest version discovered."""
     claude_dir = tmp_path / ".claude"
