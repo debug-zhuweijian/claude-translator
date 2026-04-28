@@ -42,6 +42,7 @@ def test_translate_async_llm_path(monkeypatch):
 
 def test_translate_async_override_path(monkeypatch):
     install_fake_asyncio(monkeypatch)
+
     async def run():
         chain = TranslationChain(
             overrides={"a": "手动翻译"},
@@ -59,6 +60,7 @@ def test_translate_async_override_path(monkeypatch):
 
 def test_translate_async_cache_path(monkeypatch):
     install_fake_asyncio(monkeypatch)
+
     async def run():
         chain = TranslationChain(
             overrides={},
@@ -76,6 +78,7 @@ def test_translate_async_cache_path(monkeypatch):
 
 def test_translate_async_empty_desc(monkeypatch):
     install_fake_asyncio(monkeypatch)
+
     async def run():
         chain = TranslationChain(
             overrides={},

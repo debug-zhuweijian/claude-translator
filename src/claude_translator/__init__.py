@@ -24,4 +24,4 @@ else:
     try:
         __version__ = _pkg_version("claude-translator")
     except PackageNotFoundError:
-        __version__ = "0.3.0"
+        __version__ = "0.5.0"

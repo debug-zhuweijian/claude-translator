@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 from pathlib import Path
 
 from click.testing import CliRunner
@@ -36,6 +37,17 @@ def test_cli_version():
 
 def test_version_prefers_local_checkout_version():
     assert package.__version__ == package._read_local_version()
+
+
+def test_version_metadata_stays_in_sync():
+    root = Path(__file__).resolve().parents[1]
+    pyproject = (root / "pyproject.toml").read_text(encoding="utf-8")
+    init_text = (root / "src" / "claude_translator" / "__init__.py").read_text(encoding="utf-8")
+
+    version = re.search(r'^version\s*=\s*"([^"]+)"', pyproject, re.MULTILINE)
+    assert version is not None
+    assert f'__version__ = "{version.group(1)}"' in init_text
+    assert 'claude-translator = "claude_translator.cli:main"' in pyproject
 
 
 def test_cli_sync_help_mentions_dry_run():
