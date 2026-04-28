@@ -415,6 +415,27 @@ graph TB
 
 ## 更新日志
 
+### v0.5.0
+
+- **递归发现覆盖**——现在会发现用户 agents、嵌套 commands 以及嵌套 skill bundle 的 `SKILL.md` 文件
+- **插件嵌套入口**——插件 commands、agents 和 skill bundles 支持递归入口，同时保留最新版本去重
+- **发现审计模式**——`discover --audit` 会报告 scope/kind 计数、dogfooding 分类、缺失 frontmatter 和空 description
+- **命名空间 canonical ID**——`gsd:add-backlog`、`ce:brainstorm` 等 command / agent 名称可正确解析
+
+### v0.4.0
+
+- **共享原子写 helper**——cache、overrides 和 legacy migration 写入共用一个原子写入工具
+- **更完整的客户端覆盖**——同步/异步 OpenAI 客户端和共享语言 helper 增加测试覆盖
+- **发布级 CI**——PR 和 master push 均运行 Python 3.10-3.13 matrix 与 93% 覆盖率门禁
+- **打包与 prompt 加固**——修复 editable metadata 校验，并转义 XML prompt tag breakout
+
+### v0.3.0
+
+- **异步翻译栈**——异步客户端和 `TranslationChain.translate_async` 支持并发翻译
+- **有界并发管线**——`sync` 支持 async 模式、并发控制和 rich 进度输出
+- **空输出独立统计**——空白模型输出会单独计数，不再混入 skipped records
+- **Prompt 与写入路径加固**——用户文本在 prompt 中隔离，翻译写入强制 allowed paths
+
 ### v0.2.0
 
 - **安全的 YAML frontmatter 回写**——使用 `ruamel.yaml` 正确处理引号、冒号和多行描述

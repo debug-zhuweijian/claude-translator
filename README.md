@@ -437,6 +437,27 @@ English -> Chinese (Simplified/Traditional) / Japanese / Korean, Chinese -> Japa
 
 ## What's New
 
+### v0.5.0
+
+- **Recursive discovery coverage** -- user agents, nested commands, and nested skill bundle `SKILL.md` files are now discovered
+- **Plugin nested entries** -- plugin commands, agents, and skill bundles support recursive entrypoints while preserving latest-version registry deduplication
+- **Discovery audit mode** -- `discover --audit` reports scope/kind counts, dogfooding categories, missing frontmatter, and empty descriptions
+- **Namespaced canonical IDs** -- command and agent names such as `gsd:add-backlog` and `ce:brainstorm` parse correctly
+
+### v0.4.0
+
+- **Shared atomic storage helper** -- cache, overrides, and legacy migration writes share one atomic writer
+- **Broader client coverage** -- sync/async OpenAI clients and shared language helpers have stronger tests
+- **Release-grade CI** -- Python 3.10-3.13 matrix and the 93% coverage gate run on PRs and master pushes
+- **Packaging and prompt hardening** -- editable metadata validation is fixed and XML prompt tag breakout is escaped
+
+### v0.3.0
+
+- **Async translation stack** -- async clients and `TranslationChain.translate_async` support concurrent translation
+- **Bounded concurrent pipeline** -- `sync` supports async mode, concurrency controls, and rich progress output
+- **Clear empty-output accounting** -- blank model output is reported separately from skipped records
+- **Prompt and write-path hardening** -- user text is isolated in prompts and translation writes enforce allowed paths
+
 ### v0.2.0
 
 - **Safe YAML frontmatter round-trip** -- `ruamel.yaml` now handles quoted values, colons, and multiline descriptions correctly
