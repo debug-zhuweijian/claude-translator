@@ -91,7 +91,7 @@ def test_async_openai_translate_success(monkeypatch, fake_async_openai):
     monkeypatch.setattr(
         async_openai_module,
         "wrap_user_content",
-        lambda text: f"<wrapped>{text}</wrapped>",
+        lambda text, target: f"<wrapped target='{target}'>{text}</wrapped>",
     )
 
     client = AsyncOpenAICompatClient(model="gpt-4o-mini")
@@ -101,8 +101,21 @@ def test_async_openai_translate_success(monkeypatch, fake_async_openai):
     assert result == "번역 결과"
     assert client._client.create_kwargs["messages"] == [
         {"role": "system", "content": "SYSTEM PROMPT"},
-        {"role": "user", "content": "<wrapped>hello</wrapped>"},
+        {"role": "user", "content": "<wrapped target='ko'>hello</wrapped>"},
     ]
+
+
+def test_async_openai_translate_user_message_names_target_language(monkeypatch, fake_async_openai):
+    monkeypatch.setenv("OPENAI_API_KEY", "env-secret")
+    monkeypatch.setattr(_DummyAsyncOpenAI, "response_content", '"你好"')
+    client = AsyncOpenAICompatClient(model="gpt-4o-mini")
+
+    run_coro(client.translate("hello", "en", "zh-CN"))
+
+    user_content = client._client.create_kwargs["messages"][1]["content"]
+    assert "Simplified Chinese" in user_content
+    assert "<text_to_translate>" in user_content
+    assert "hello" in user_content
 
 
 def test_async_openai_translate_empty_response_raises(monkeypatch, fake_async_openai):

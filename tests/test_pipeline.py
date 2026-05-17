@@ -54,3 +54,21 @@ def test_run_sync_skips_existing_target_script(tmp_path: Path):
 
     assert report.skip == 1
     assert report.total == 1
+
+
+def test_run_sync_translates_target_script_with_english_sentence_residue(tmp_path: Path):
+    md_file = tmp_path / "demo.md"
+    record = _record(md_file, "中文说明 This sentence should be translated.")
+    inventory = Inventory((record,))
+    chain = TranslationChain(
+        overrides={},
+        cache={},
+        on_cache_update=lambda lang, cid, text: None,
+        client=FakeClient(),
+        target_lang="zh-CN",
+    )
+
+    report = run_sync(inventory, chain, "zh-CN", dry_run=True)
+
+    assert report.llm == 1
+    assert report.total == 1

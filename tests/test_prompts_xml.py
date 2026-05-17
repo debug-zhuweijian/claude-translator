@@ -33,6 +33,13 @@ def test_wrap_escapes_xml_meta_characters():
     assert "5 &lt; 7 &amp; 9 &gt; 3" in out
 
 
+def test_wrap_user_content_names_target_language_when_provided():
+    out = wrap_user_content("Hello world", "zh-CN")
+    assert "Simplified Chinese" in out
+    assert "<text_to_translate>" in out
+    assert "Hello world" in out
+
+
 def test_get_prompt_still_works():
     prompt = get_prompt("en", "zh-CN")
     assert "Simplified Chinese" in prompt

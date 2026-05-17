@@ -5,10 +5,21 @@ from __future__ import annotations
 import logging
 import os
 
-from claude_translator.lang.cleaner import clean_llm_response
+from claude_translator.lang.cleaner import TranslatorError, clean_llm_response
+from claude_translator.lang.detect import detect_script
 from claude_translator.lang.prompts import get_prompt, wrap_user_content
 
 logger = logging.getLogger(__name__)
+
+
+def _validate_target_script(text: str, target_lang: str) -> str:
+    if target_lang.startswith("zh") and detect_script(text) != "zh":
+        raise TranslatorError("LLM returned non-Chinese translation")
+    if target_lang == "ja" and detect_script(text) != "ja":
+        raise TranslatorError("LLM returned non-Japanese translation")
+    if target_lang == "ko" and detect_script(text) != "ko":
+        raise TranslatorError("LLM returned non-Korean translation")
+    return text
 
 
 class AsyncOpenAICompatClient:
@@ -35,7 +46,7 @@ class AsyncOpenAICompatClient:
             model=self._model,
             messages=[
                 {"role": "system", "content": prompt},
-                {"role": "user", "content": wrap_user_content(text)},
+                {"role": "user", "content": wrap_user_content(text, target_lang)},
             ],
             temperature=0.3,
             max_tokens=1024,
@@ -43,4 +54,4 @@ class AsyncOpenAICompatClient:
         result = response.choices[0].message.content
         if result is None:
             raise RuntimeError("LLM returned empty response")
-        return clean_llm_response(result)
+        return _validate_target_script(clean_llm_response(result), target_lang)

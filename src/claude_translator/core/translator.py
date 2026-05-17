@@ -48,6 +48,10 @@ class TranslationChain:
     def failures(self) -> list[tuple[Record, Exception]]:
         return list(self._failures)
 
+    @property
+    def target_lang(self) -> str:
+        return self._target_lang
+
     def has_override(self, canonical_id: str) -> bool:
         return canonical_id in self._overrides
 
@@ -89,8 +93,8 @@ class TranslationChain:
 
         try:
             translation = self._get_client().translate(desc, "en", self._target_lang)
-            self._cache[cid] = translation
             self._on_cache_update(self._target_lang, cid, translation)
+            self._cache[cid] = translation
             return replace(record, matched_translation=translation, status="llm")
         except Exception as exc:
             logger.warning("LLM translation failed for %s, falling back to original: %s", cid, exc)
@@ -114,8 +118,8 @@ class TranslationChain:
         try:
             translation = await self._get_async_client().translate(desc, "en", self._target_lang)
             async with self._get_cache_lock():
-                self._cache[cid] = translation
                 self._on_cache_update(self._target_lang, cid, translation)
+                self._cache[cid] = translation
             return replace(record, matched_translation=translation, status="llm")
         except Exception as exc:
             logger.warning(

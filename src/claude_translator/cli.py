@@ -15,13 +15,22 @@ from claude_translator.clients.async_openai import AsyncOpenAICompatClient
 from claude_translator.clients.openai_compat import OpenAICompatClient
 from claude_translator.config.loaders import load_config
 from claude_translator.core.discovery import discover_all
+from claude_translator.core.display import find_duplicate_display_groups
 from claude_translator.core.frontmatter import FrontmatterParser
+from claude_translator.core.governance import (
+    GovernanceOptions,
+    GovernanceReport,
+    apply_governance_plan,
+    create_governance_plan,
+    restore_from_manifest,
+)
+from claude_translator.core.language_policy import check_inventory_language
 from claude_translator.core.migration import migrate_legacy
 from claude_translator.core.models import Inventory
 from claude_translator.core.pipeline import run_async, run_sync, script_tag_for_lang
 from claude_translator.core.translator import TranslationChain
 from claude_translator.lang.detect import detect_script
-from claude_translator.storage.cache import load_cache, save_cache
+from claude_translator.storage.cache import CACHE_SCHEMA_VERSION, load_cache, save_cache
 from claude_translator.storage.overrides import load_overrides
 from claude_translator.storage.paths import (
     ensure_translations_dir,
@@ -89,6 +98,7 @@ def _print_discovery_audit(inventory: Inventory) -> None:
         for record in inventory.records
         if record.frontmatter_present and not record.current_description
     ]
+    duplicate_display_groups = find_duplicate_display_groups(inventory.records)
 
     click.echo("Audit summary")
     click.echo(f"  total: {inventory.size()}")
@@ -103,6 +113,9 @@ def _print_discovery_audit(inventory: Inventory) -> None:
     click.echo(f"  empty descriptions: {len(empty_descriptions)}")
     for record in empty_descriptions[:5]:
         click.echo(f"    {record.canonical_id}")
+    click.echo(f"  duplicate display groups: {len(duplicate_display_groups)}")
+    for group in duplicate_display_groups[:5]:
+        click.echo(f"    {group.display_key.kind}:{group.display_key.name}")
 
 
 @main.command()
@@ -221,9 +234,109 @@ def sync(lang: str | None, dry_run: bool, concurrency: int, async_mode: bool) ->
         sys.exit(1)
 
 
+def _parse_translation_options(values: tuple[str, ...]) -> dict[str, str]:
+    translations: dict[str, str] = {}
+    for value in values:
+        if "=" not in value:
+            raise click.ClickException("--translation must use canonical_id=text format")
+        canonical_id, text = value.split("=", 1)
+        if not canonical_id or not text:
+            raise click.ClickException("--translation must use canonical_id=text format")
+        translations[canonical_id] = text
+    return translations
+
+
+def _load_cache_from_dir(translations_dir: Path, lang: str) -> dict[str, str]:
+    path = translations_dir / f"cache-{lang}.json"
+    if not path.exists():
+        return {}
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {}
+    if raw.get("_schema_version") != CACHE_SCHEMA_VERSION:
+        return {}
+    return {key: value for key, value in raw.items() if key != "_schema_version"}
+
+
+def _load_overrides_from_dir(translations_dir: Path, lang: str) -> dict[str, str]:
+    path = translations_dir / f"overrides-{lang}.json"
+    if not path.exists():
+        return {}
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {}
+    return {str(key): str(value) for key, value in raw.items()}
+
+
+@main.command()
+@click.option("--lang", default=None, help="Target language override")
+@click.option("--apply", is_flag=True, default=False, help="Apply planned governance changes")
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Preview governance changes without writing files",
+)
+@click.option(
+    "--translation",
+    multiple=True,
+    help="Governance rewrite mapping in canonical_id=text format",
+)
+def govern(
+    lang: str | None, apply: bool, dry_run: bool, translation: tuple[str, ...]
+) -> None:
+    """Plan or apply runtime description governance."""
+    config = load_config(config_path=get_config_path(), target_lang=lang)
+    translations_dir = get_translations_dir()
+    migrate_legacy(translations_dir, config.target_lang)
+    claude_dir = get_claude_dir()
+    inventory = discover_all(claude_dir)
+    explicit_translations = _parse_translation_options(translation)
+    translations = {
+        **_load_cache_from_dir(translations_dir, config.target_lang),
+        **_load_overrides_from_dir(translations_dir, config.target_lang),
+        **explicit_translations,
+    }
+    options = GovernanceOptions(
+        target_lang=config.target_lang,
+        translations=translations,
+        backup_root=translations_dir / "governance-backups",
+    )
+    plan = create_governance_plan(inventory, options)
+
+    if not apply:
+        report = GovernanceReport(
+            scanned=inventory.size(),
+            strict_language_violations=len(plan.language_violations),
+            duplicate_display_groups=len(plan.duplicate_groups),
+            planned_description_rewrites=len(plan.actions),
+            unresolved_duplicate_groups=len(plan.duplicate_groups),
+        )
+        click.echo(report.summary_line())
+        click.echo("No files changed")
+        return
+
+    report = apply_governance_plan(plan, options)
+    click.echo(report.summary_line())
+
+
+@main.command()
+@click.option("--manifest", type=click.Path(path_type=Path), required=True, help="Manifest path")
+@click.option("--apply", is_flag=True, default=False, help="Apply restore changes")
+def restore(manifest: Path, apply: bool) -> None:
+    """Restore files from a governance manifest."""
+    report = restore_from_manifest(manifest, apply=apply)
+    click.echo(report.summary_line())
+
+
 @main.command()
 @click.option("--lang", default=None, help="Target language to verify")
-def verify(lang: str | None) -> None:
+@click.option(
+    "--strict", is_flag=True, default=False, help="Verify strict language and display rules"
+)
+def verify(lang: str | None, strict: bool) -> None:
     """Verify translation coverage and report status."""
     config = load_config(config_path=get_config_path(), target_lang=lang)
     migrate_legacy(get_translations_dir(), config.target_lang)
@@ -251,6 +364,16 @@ def verify(lang: str | None) -> None:
         else:
             missing += 1
             click.echo(f"  MISSING: {record.canonical_id}")
+
+    if strict:
+        language_violations = check_inventory_language(inventory, config.target_lang)
+        duplicate_groups = find_duplicate_display_groups(inventory.records)
+        for violation in language_violations:
+            click.echo(f"  STRICT_LANGUAGE: {violation.canonical_id} ({violation.reason})")
+        for group in duplicate_groups:
+            click.echo(f"  DUPLICATE_DISPLAY: {group.display_key.kind}:{group.display_key.name}")
+        if language_violations or duplicate_groups:
+            sys.exit(1)
 
     total = inventory.size()
     pct = (covered / total * 100) if total > 0 else 0

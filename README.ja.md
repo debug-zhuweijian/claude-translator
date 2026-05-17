@@ -370,16 +370,20 @@ export CLAUDE_TRANSLATE_LLM_MODEL="Qwen/Qwen2.5-7B-Instruct"
 | **BOM セーフ** | Windows エディタが追加した UTF-8 BOM マーカーを保持 |
 | **レガシーマイグレーション** | 初回実行時に旧形式の翻訳データを自動移行 |
 | **設定カスケード** | CLI 引数 -> 環境変数 -> 設定ファイル -> デフォルト値 |
-| **Dry Run** | `sync --dry-run` でファイルを書き換えずに変更内容を確認 |
+| **Dry Run** | `sync --dry-run` と `govern` でファイルを書き換えずに変更内容を確認 |
+| **Runtime Governance** | `govern` は適用前に厳格な言語違反と表示上の重複エントリを検出 |
+| **Manifest Restore** | `restore --manifest` はハッシュ検証付きで治理変更をプレビューまたは復元 |
 
 ## CLI リファレンス
 
 | コマンド | 説明 |
 |---------|-------------|
 | `init --lang LANG` | ターゲット言語を設定して config を作成 |
-| `discover [--lang LANG] [--audit]` | 翻訳可能なアイテムと任意のスキャン監査サマリーを一覧表示 |
+| `discover [--lang LANG] [--audit]` | 翻訳可能なアイテムと任意のスキャン監査サマリー、重複表示グループを一覧表示 |
 | `sync [--lang LANG] [--dry-run]` | 説明を翻訳してファイルに書き込み |
-| `verify [--lang LANG]` | カバレッジを確認し、未翻訳アイテムを報告 |
+| `govern [--lang LANG] [--dry-run] [--apply]` | 厳格な description governance を計画または適用。既定は dry-run、適用時は backup manifest を作成 |
+| `restore --manifest PATH [--apply]` | governance manifest からファイルの復元をプレビューまたは適用し、ハッシュで安全性を確認 |
+| `verify [--lang LANG] [--strict]` | カバレッジを確認し、`--strict` では言語ポリシー違反または重複表示違反で失敗 |
 
 ## アーキテクチャ
 
