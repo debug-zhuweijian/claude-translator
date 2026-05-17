@@ -73,6 +73,26 @@ def get_prompt(source_lang: str, target_lang: str) -> str:
     return _GENERIC_PROMPT.format(source_lang=source_lang, target_lang=target_lang)
 
 
-def wrap_user_content(text: str) -> str:
+def _target_language_name(target_lang: str) -> str:
+    if target_lang == "zh-CN":
+        return "Simplified Chinese"
+    if target_lang == "zh-TW":
+        return "Traditional Chinese"
+    if target_lang == "ja":
+        return "Japanese"
+    if target_lang == "ko":
+        return "Korean"
+    return target_lang
+
+
+def wrap_user_content(text: str, target_lang: str | None = None) -> str:
     """Wrap user-supplied content in XML tags for prompt-injection isolation."""
-    return f"<text_to_translate>\n{escape(text)}\n</text_to_translate>"
+    wrapped = f"<text_to_translate>\n{escape(text)}\n</text_to_translate>"
+    if target_lang is None:
+        return wrapped
+    target_name = _target_language_name(target_lang)
+    return (
+        f"Translate the text inside <text_to_translate> to {target_name}. "
+        "Reply with only the translation.\n"
+        f"{wrapped}"
+    )

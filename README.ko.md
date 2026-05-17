@@ -370,16 +370,20 @@ export CLAUDE_TRANSLATE_LLM_MODEL="Qwen/Qwen2.5-7B-Instruct"
 | **BOM 안전** | Windows 편집기가 추가한 UTF-8 BOM 마커 보존 |
 | **레거시 마이그레이션** | 첫 실행 시 이전 형식의 번역 데이터를 자동 마이그레이션 |
 | **설정 우선순위** | CLI 인수 -> 환경 변수 -> 설정 파일 -> 기본값 |
-| **Dry Run** | `sync --dry-run` 으로 파일을 쓰지 않고 변경 사항 미리 보기 |
+| **Dry Run** | `sync --dry-run` 과 `govern` 으로 파일을 쓰지 않고 변경 사항 미리 보기 |
+| **Runtime Governance** | `govern` 은 적용 전에 strict language 위반과 표시 중복 entry 를 감지 |
+| **Manifest Restore** | `restore --manifest` 는 hash check 로 governance 변경을 미리 보거나 복원 |
 
 ## CLI 참조
 
 | 명령 | 설명 |
 |------|------|
 | `init --lang LANG` | 대상 언어로 설정 생성 |
-| `discover [--lang LANG] [--audit]` | 번역 가능한 항목과 선택적 스캔 감사 요약 나열 |
+| `discover [--lang LANG] [--audit]` | 번역 가능한 항목과 선택적 스캔 감사 요약, duplicate display groups 나열 |
 | `sync [--lang LANG] [--dry-run]` | 설명 번역 후 파일에 기록 |
-| `verify [--lang LANG]` | 커버리지 확인, 누락된 항목 보고 |
+| `govern [--lang LANG] [--apply]` | strict description governance 를 계획하거나 적용합니다. 기본값은 dry-run 이며 적용 시 backup manifest 를 작성 |
+| `restore --manifest PATH [--apply]` | governance manifest 에서 파일 복원을 미리 보거나 적용하고 hash safety 를 확인 |
+| `verify [--lang LANG] [--strict]` | 커버리지를 확인하고 `--strict` 에서는 language-policy 또는 duplicate-display 위반 시 실패 |
 
 ## 아키텍처
 

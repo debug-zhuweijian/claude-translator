@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Runtime description governance** -- added `govern`, `restore`, and `verify --strict` for strict target-language checks, duplicate display-key diagnostics, byte-level backups, and hash-gated manifest restore.
+- **Display-key duplicate auditing** -- `discover --audit` now reports duplicate visible entry groups by kind and name.
+
+### Changed
+
+- **Governance documentation** -- README files now document dry-run governance, manifest restore, and strict verification workflows.
+
 ## [0.5.0] - 2026-04-27
 
 ### Added

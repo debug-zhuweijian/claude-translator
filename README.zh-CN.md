@@ -370,16 +370,20 @@ skill bundle 内部的支持文档会被忽略，除非它是入口文件 `SKILL
 | **BOM 安全** | 保留 Windows 编辑器添加的 UTF-8 BOM 标记 |
 | **遗留数据迁移** | 首次运行时自动迁移旧格式翻译数据 |
 | **配置优先级链** | CLI 参数 -> 环境变量 -> 配置文件 -> 默认值 |
-| **Dry Run** | `sync --dry-run` 可在不写入文件的情况下预览变更 |
+| **Dry Run** | `sync --dry-run` 与 `govern` 可在不写入文件的情况下预览变更 |
+| **运行态治理** | `govern` 会在写入前检测严格语言违规和可见入口重复 |
+| **清单恢复** | `restore --manifest` 可通过哈希校验预览或恢复治理变更 |
 
 ## CLI 参考
 
 | 命令 | 说明 |
 |------|------|
 | `init --lang LANG` | 创建配置并设置目标语言 |
-| `discover [--lang LANG] [--audit]` | 列出可翻译条目及可选扫描审计摘要 |
+| `discover [--lang LANG] [--audit]` | 列出可翻译条目及可选扫描审计摘要，包括重复展示分组 |
 | `sync [--lang LANG] [--dry-run]` | 翻译描述并写入文件 |
-| `verify [--lang LANG]` | 检查覆盖率，报告遗漏条目 |
+| `govern [--lang LANG] [--apply]` | 规划或应用严格描述治理；默认只预览，应用时写入备份清单 |
+| `restore --manifest PATH [--apply]` | 预览或按治理清单恢复文件，并执行哈希安全校验 |
+| `verify [--lang LANG] [--strict]` | 检查覆盖率；加 `--strict` 时对语言策略或重复展示违规返回失败 |
 
 ## 架构
 

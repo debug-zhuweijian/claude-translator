@@ -392,16 +392,20 @@ Skill support documents under a skill bundle are ignored unless they are the ent
 | **BOM Safe** | Preserves UTF-8 BOM markers added by Windows editors |
 | **Legacy Migration** | Auto-migrates old-format translation data on first run |
 | **Config Cascade** | CLI args -> env vars -> config file -> defaults |
-| **Dry Run** | `sync --dry-run` previews translation work without writing files |
+| **Dry Run** | `sync --dry-run` and `govern` preview work without writing files |
+| **Runtime Governance** | `govern` detects strict-language violations and duplicate visible entries before applying changes |
+| **Manifest Restore** | `restore --manifest` previews or restores governance changes with hash checks |
 
 ## CLI Reference
 
 | Command | Description |
 |---------|-------------|
 | `init --lang LANG` | Create config with target language |
-| `discover [--lang LANG] [--audit]` | List translatable items and optional scan audit summary |
+| `discover [--lang LANG] [--audit]` | List translatable items and optional scan audit summary, including duplicate display groups |
 | `sync [--lang LANG] [--dry-run]` | Translate descriptions and write to files |
-| `verify [--lang LANG]` | Check coverage, report missing items |
+| `govern [--lang LANG] [--apply]` | Plan or apply strict description governance; defaults to dry-run and writes a backup manifest on apply |
+| `restore --manifest PATH [--apply]` | Preview or restore files from a governance manifest with hash-gated safety |
+| `verify [--lang LANG] [--strict]` | Check coverage, and with `--strict` fail on language-policy or duplicate-display violations |
 
 ## Architecture
 
