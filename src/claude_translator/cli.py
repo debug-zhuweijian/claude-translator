@@ -311,7 +311,7 @@ def govern(
             scanned=inventory.size(),
             strict_language_violations=len(plan.language_violations),
             duplicate_display_groups=len(plan.duplicate_groups),
-            planned_description_rewrites=max(len(plan.actions), len(plan.language_violations)),
+            planned_description_rewrites=len(plan.actions),
             unresolved_duplicate_groups=len(plan.duplicate_groups),
         )
         click.echo(report.summary_line())

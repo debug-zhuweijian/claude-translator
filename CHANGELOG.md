@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-05-17
+
+### Fixed
+
+- **End-to-end runtime governance** -- `/translate-descriptions` now converges through sync, governance apply, and strict verification without leaving empty descriptions, embedded English sentences, or duplicate display groups unresolved.
+- **Strict CJK locale handling** -- language policy now validates `zh*`, `ja*`, and `ko*` targets consistently, including locale variants such as `ja-JP` and `ko-KR`.
+- **Duplicate suppression restore safety** -- duplicate entry suppression now uses unique disabled filenames and manifest restore coverage for moved entries.
+
 ## [0.6.0] - 2026-05-17
 
 ### Added
@@ -114,6 +122,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Canonical ID system** -- `plugin.<key>.<kind>:<name>` / `user.<kind>:<name>`
 - **Immutable data models** -- frozen dataclasses throughout
 
+[0.6.1]: https://github.com/debug-zhuweijian/claude-translator/releases/tag/v0.6.1
 [0.6.0]: https://github.com/debug-zhuweijian/claude-translator/releases/tag/v0.6.0
 [0.5.0]: https://github.com/debug-zhuweijian/claude-translator/releases/tag/v0.5.0
 [0.4.0]: https://github.com/debug-zhuweijian/claude-translator/releases/tag/v0.4.0

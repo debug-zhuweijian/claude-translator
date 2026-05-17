@@ -15,11 +15,18 @@ def _write_entry(path: Path, description: str) -> None:
     path.write_text(f"---\ndescription: {description}\n---\n# Body\n", encoding="utf-8")
 
 
-def _record(path: Path, canonical_id: str, description: str, *, scope: str = "user") -> Record:
+def _record(
+    path: Path,
+    canonical_id: str,
+    description: str,
+    *,
+    scope: str = "user",
+    kind: str = "skill",
+) -> Record:
     _write_entry(path, description)
     return Record(
         canonical_id=canonical_id,
-        kind="skill",
+        kind=kind,
         scope=scope,
         source_path=str(path),
         relative_path="skill/SKILL.md",
@@ -127,3 +134,56 @@ def test_restore_from_manifest_refuses_hash_mismatch(tmp_path: Path):
     assert restore_report.restored == 0
     assert restore_report.refused == 1
     assert "用户后续修改" in target.read_text(encoding="utf-8")
+
+
+def test_create_governance_plan_autofills_empty_descriptions(tmp_path: Path):
+    entry = _record(
+        tmp_path / "agents" / "demo.md", "user.agent:demo-agent", "", kind="agent"
+    )
+    inventory = Inventory((entry,))
+
+    plan = create_governance_plan(inventory, GovernanceOptions(target_lang="zh-CN"))
+
+    assert len(plan.language_violations) == 1
+    assert len(plan.actions) == 1
+    assert plan.actions[0].action_type == "rewrite_description"
+    assert plan.actions[0].replacement_description == "用户级 agent demo-agent 入口说明"
+
+
+def test_create_governance_plan_autofills_empty_descriptions_for_ja_and_ko(
+    tmp_path: Path,
+):
+    entry = _record(
+        tmp_path / "agents" / "demo.md", "user.agent:demo-agent", "", kind="agent"
+    )
+    inventory = Inventory((entry,))
+
+    ja_plan = create_governance_plan(inventory, GovernanceOptions(target_lang="ja"))
+    ko_plan = create_governance_plan(inventory, GovernanceOptions(target_lang="ko"))
+
+    assert ja_plan.actions[0].replacement_description == "ユーザー agent demo-agent の入口説明"
+    assert ko_plan.actions[0].replacement_description == "사용자 agent demo-agent 항목 설명"
+
+
+def test_apply_governance_plan_suppresses_duplicate_when_disabled_path_exists(
+    tmp_path: Path,
+):
+    user = _record(tmp_path / "user" / "demo" / "SKILL.md", "user.skill:demo", "中文说明")
+    plugin = _record(
+        tmp_path / "plugin" / "demo" / "SKILL.md",
+        "plugin.demo.skill:demo",
+        "中文说明",
+        scope="plugin",
+    )
+    disabled = Path(plugin.source_path).with_name("SKILL.md.claude-translator-disabled")
+    disabled.write_text("existing disabled copy", encoding="utf-8")
+    options = GovernanceOptions(target_lang="zh-CN", backup_root=tmp_path / "backups")
+
+    report = apply_governance_plan(
+        create_governance_plan(Inventory((user, plugin)), options), options
+    )
+
+    assert report.applied_duplicate_suppressions == 1
+    assert not Path(plugin.source_path).exists()
+    assert disabled.exists()
+    assert Path(str(disabled) + ".1").exists()

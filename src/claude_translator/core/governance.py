@@ -40,6 +40,7 @@ class GovernancePlan:
     actions: tuple[GovernanceAction, ...]
     duplicate_groups: tuple[DuplicateGroup, ...]
     language_violations: tuple[LanguageViolation, ...]
+    scanned: int
 
 
 @dataclass(frozen=True)
@@ -61,8 +62,12 @@ class GovernanceReport:
             f"duplicate_display_groups={self.duplicate_display_groups}",
             f"planned_description_rewrites={self.planned_description_rewrites}",
         ]
+        if self.planned_duplicate_suppressions:
+            parts.append(f"planned_duplicate_suppressions={self.planned_duplicate_suppressions}")
         if self.applied_description_rewrites:
             parts.append(f"applied_description_rewrites={self.applied_description_rewrites}")
+        if self.applied_duplicate_suppressions:
+            parts.append(f"applied_duplicate_suppressions={self.applied_duplicate_suppressions}")
         if self.unresolved_duplicate_groups:
             parts.append(f"unresolved_duplicate_groups={self.unresolved_duplicate_groups}")
         if self.backup_manifest:
@@ -97,9 +102,27 @@ def _backup_root(options: GovernanceOptions) -> Path:
     return options.backup_root or get_translations_dir() / "governance-backups"
 
 
+def _empty_description_replacement(record: Record, target_lang: str) -> str | None:
+    display_name = record.canonical_id.split(":", 1)[1]
+    if target_lang.startswith("zh"):
+        scope_label = "用户级" if record.scope == "user" else "插件级"
+        return f"{scope_label} {record.kind} {display_name} 入口说明"
+    if target_lang.startswith("ja"):
+        scope_label = "ユーザー" if record.scope == "user" else "プラグイン"
+        return f"{scope_label} {record.kind} {display_name} の入口説明"
+    if target_lang.startswith("ko"):
+        scope_label = "사용자" if record.scope == "user" else "플러그인"
+        return f"{scope_label} {record.kind} {display_name} 항목 설명"
+    return None
+
+
 def _description_replacement(record: Record, options: GovernanceOptions) -> str | None:
     translations = options.translations or {}
-    return translations.get(record.canonical_id)
+    if record.canonical_id in translations:
+        return translations[record.canonical_id]
+    if not record.current_description.strip():
+        return _empty_description_replacement(record, options.target_lang)
+    return None
 
 
 def create_governance_plan(
@@ -132,6 +155,7 @@ def create_governance_plan(
         actions=actions,
         duplicate_groups=find_duplicate_display_groups(inventory.records),
         language_violations=violations,
+        scanned=inventory.size(),
     )
 
 
@@ -149,6 +173,35 @@ def _rewrite_description_bytes(path: Path, description: str) -> bytes:
     return b"\xef\xbb\xbf" + out if has_bom else out
 
 
+def _preferred_duplicate_record(group: DuplicateGroup) -> Record:
+    user_records = tuple(record for record in group.records if record.scope == "user")
+    if user_records:
+        return sorted(user_records, key=lambda record: record.source_path)[0]
+    return sorted(group.records, key=lambda record: record.source_path)[0]
+
+
+def _duplicate_suppression_targets(plan: GovernancePlan) -> tuple[Record, ...]:
+    targets: tuple[Record, ...] = ()
+    for group in plan.duplicate_groups:
+        preferred = _preferred_duplicate_record(group)
+        for record in group.records:
+            if record.source_path != preferred.source_path:
+                targets = (*targets, record)
+    return targets
+
+
+def _available_suppressed_path(path: Path) -> Path:
+    base = path.with_name(path.name + ".claude-translator-disabled")
+    if not base.exists():
+        return base
+    index = 1
+    while True:
+        candidate = Path(str(base) + f".{index}")
+        if not candidate.exists():
+            return candidate
+        index += 1
+
+
 def apply_governance_plan(
     plan: GovernancePlan,
     options: GovernanceOptions | None = None,
@@ -160,6 +213,7 @@ def apply_governance_plan(
 
     manifest_items: list[dict[str, str]] = []
     applied = 0
+    suppressed = 0
 
     for action in plan.actions:
         path = Path(action.target.source_path)
@@ -188,6 +242,32 @@ def apply_governance_plan(
             }
         )
 
+    for record in _duplicate_suppression_targets(plan):
+        path = Path(record.source_path)
+        if not path.exists():
+            continue
+        current_hash = _file_sha256(path)
+        backup_path = backup_dir / f"{len(manifest_items):04d}-{path.name}"
+        shutil.copy2(path, backup_path)
+        suppressed_path = _available_suppressed_path(path)
+        path.replace(suppressed_path)
+        suppressed += 1
+        display_name = record.canonical_id.split(":", 1)[1]
+        manifest_items.append(
+            {
+                "canonical_id": record.canonical_id,
+                "display_key": f"{record.kind}:{display_name}",
+                "source_path": str(path),
+                "backup_path": str(backup_path),
+                "suppressed_path": str(suppressed_path),
+                "action": "suppress_duplicate",
+                "reason": "duplicate_display",
+                "old_sha256": current_hash,
+                "new_sha256": "moved",
+                "status": "applied",
+            }
+        )
+
     manifest_path = backup_dir / "manifest.json"
     manifest = {
         "schema_version": 1,
@@ -202,12 +282,14 @@ def apply_governance_plan(
     )
 
     return GovernanceReport(
-        scanned=len(plan.actions),
+        scanned=plan.scanned,
         strict_language_violations=len(plan.language_violations),
         duplicate_display_groups=len(plan.duplicate_groups),
         planned_description_rewrites=len(plan.actions),
+        planned_duplicate_suppressions=len(_duplicate_suppression_targets(plan)),
         applied_description_rewrites=applied,
-        unresolved_duplicate_groups=len(plan.duplicate_groups),
+        applied_duplicate_suppressions=suppressed,
+        unresolved_duplicate_groups=max(len(plan.duplicate_groups) - suppressed, 0),
         backup_manifest=str(manifest_path),
     )
 
@@ -224,10 +306,20 @@ def restore_from_manifest(manifest_path: Path, *, apply: bool = False) -> Restor
     for item in items:
         source_path = Path(item["source_path"])
         backup_path = Path(item["backup_path"])
-        if _file_sha256(source_path) != item["new_sha256"]:
-            refused += 1
-            continue
-        shutil.copy2(backup_path, source_path)
+        if item.get("new_sha256") == "moved":
+            suppressed_path = Path(item["suppressed_path"])
+            if source_path.exists():
+                refused += 1
+                continue
+            if suppressed_path.exists():
+                suppressed_path.replace(source_path)
+            else:
+                shutil.copy2(backup_path, source_path)
+        else:
+            if _file_sha256(source_path) != item["new_sha256"]:
+                refused += 1
+                continue
+            shutil.copy2(backup_path, source_path)
         if _file_sha256(source_path) == item["old_sha256"]:
             restored += 1
         else:

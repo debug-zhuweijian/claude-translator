@@ -96,6 +96,27 @@ def test_run_async_cjk_skip(tmp_path: Path, monkeypatch):
     assert report.total == 1
 
 
+def test_run_async_translates_cjk_text_with_english_sentence_residue(
+    tmp_path: Path, monkeypatch
+):
+    install_fake_asyncio(monkeypatch)
+    md = tmp_path / "mixed.md"
+    record = _record(md, "mixed", "中文说明 This sentence should be translated.")
+    inventory = Inventory((record,))
+    chain = TranslationChain(
+        overrides={},
+        cache={},
+        on_cache_update=lambda lang, cid, text: None,
+        async_client=AsyncFakeClient(),
+        target_lang="zh-CN",
+    )
+
+    report = run_coro(run_async(inventory, chain, "zh-CN", concurrency=1, dry_run=True))
+
+    assert report.llm == 1
+    assert report.total == 1
+
+
 def test_run_async_progress_callback(tmp_path: Path, monkeypatch):
     install_fake_asyncio(monkeypatch)
     advances = []

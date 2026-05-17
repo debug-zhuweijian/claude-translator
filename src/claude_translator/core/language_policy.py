@@ -61,16 +61,27 @@ def _has_disallowed_english_tokens(text: str) -> bool:
     return any(token.upper() not in _ALLOWED_TECH_TOKENS for token in tokens)
 
 
+def _script_tag_for_lang(target_lang: str) -> str | None:
+    if target_lang.startswith("zh"):
+        return "zh"
+    if target_lang.startswith("ja"):
+        return "ja"
+    if target_lang.startswith("ko"):
+        return "ko"
+    return None
+
+
 def check_description_language(record: Record, target_lang: str) -> tuple[LanguageViolation, ...]:
     text = record.current_description.strip()
     if not text:
         return (LanguageViolation(record.canonical_id, "empty", ""),)
 
-    if not target_lang.startswith("zh"):
+    expected_script = _script_tag_for_lang(target_lang)
+    if expected_script is None:
         return ()
 
     script = detect_script(text)
-    if script != "zh":
+    if script != expected_script:
         reason = "english_only" if _english_tokens(text) else "target_script_missing"
         return (LanguageViolation(record.canonical_id, reason, _excerpt(text)),)
 

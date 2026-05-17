@@ -48,6 +48,10 @@ class TranslationChain:
     def failures(self) -> list[tuple[Record, Exception]]:
         return list(self._failures)
 
+    @property
+    def target_lang(self) -> str:
+        return self._target_lang
+
     def has_override(self, canonical_id: str) -> bool:
         return canonical_id in self._overrides
 

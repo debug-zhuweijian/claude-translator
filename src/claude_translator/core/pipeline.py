@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from claude_translator.core.injector import inject_translation
+from claude_translator.core.language_policy import is_description_strict
 from claude_translator.core.models import Inventory, Record
 from claude_translator.core.report import SyncReport
 from claude_translator.core.translator import TranslationChain
@@ -32,6 +33,7 @@ def _should_cjk_skip(record: Record, expected_script: str | None, chain: Transla
         expected_script
         and record.current_description
         and detect_script(record.current_description) == expected_script
+        and is_description_strict(record, chain.target_lang)
         and not chain.has_override(record.canonical_id)
     )
 

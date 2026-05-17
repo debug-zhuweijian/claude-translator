@@ -22,6 +22,20 @@ def test_strict_zh_cn_accepts_chinese_with_allowed_technical_tokens():
     assert check_description_language(record, "zh-CN") == ()
 
 
+def test_strict_zh_cn_accepts_chinese_with_short_product_name():
+    record = _record("使用 Cursor 编辑代码")
+
+    assert check_description_language(record, "zh-CN") == ()
+
+
+def test_strict_ja_and_ko_locale_variants_detect_expected_script():
+    assert check_description_language(_record("日本語の説明"), "ja-JP") == ()
+    assert check_description_language(_record("한국어 설명"), "ko-KR") == ()
+
+    assert check_description_language(_record("English only"), "ja-JP")[0].reason == "english_only"
+    assert check_description_language(_record("English only"), "ko-KR")[0].reason == "english_only"
+
+
 def test_strict_zh_cn_rejects_empty_description():
     violations = check_description_language(_record(""), "zh-CN")
 
