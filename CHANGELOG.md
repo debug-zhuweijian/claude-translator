@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-05-17
+
 ### Added
 
 - **Runtime description governance** -- added `govern`, `restore`, and `verify --strict` for strict target-language checks, duplicate display-key diagnostics, byte-level backups, and hash-gated manifest restore.
@@ -15,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Governance documentation** -- README files now document dry-run governance, manifest restore, and strict verification workflows.
+
+### Fixed
+
+- **Explicit governance dry-run** -- `govern --dry-run` is now accepted so `/translate-descriptions` can call its default dry-run workflow directly.
 
 ## [0.5.0] - 2026-04-27
 
@@ -108,6 +114,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Canonical ID system** -- `plugin.<key>.<kind>:<name>` / `user.<kind>:<name>`
 - **Immutable data models** -- frozen dataclasses throughout
 
+[0.6.0]: https://github.com/debug-zhuweijian/claude-translator/releases/tag/v0.6.0
 [0.5.0]: https://github.com/debug-zhuweijian/claude-translator/releases/tag/v0.5.0
 [0.4.0]: https://github.com/debug-zhuweijian/claude-translator/releases/tag/v0.4.0
 [0.2.0]: https://github.com/debug-zhuweijian/claude-translator/releases/tag/v0.2.0

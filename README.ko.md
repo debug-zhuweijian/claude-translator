@@ -381,7 +381,7 @@ export CLAUDE_TRANSLATE_LLM_MODEL="Qwen/Qwen2.5-7B-Instruct"
 | `init --lang LANG` | 대상 언어로 설정 생성 |
 | `discover [--lang LANG] [--audit]` | 번역 가능한 항목과 선택적 스캔 감사 요약, duplicate display groups 나열 |
 | `sync [--lang LANG] [--dry-run]` | 설명 번역 후 파일에 기록 |
-| `govern [--lang LANG] [--apply]` | strict description governance 를 계획하거나 적용합니다. 기본값은 dry-run 이며 적용 시 backup manifest 를 작성 |
+| `govern [--lang LANG] [--dry-run] [--apply]` | strict description governance 를 계획하거나 적용합니다. 기본값은 dry-run 이며 적용 시 backup manifest 를 작성 |
 | `restore --manifest PATH [--apply]` | governance manifest 에서 파일 복원을 미리 보거나 적용하고 hash safety 를 확인 |
 | `verify [--lang LANG] [--strict]` | 커버리지를 확인하고 `--strict` 에서는 language-policy 또는 duplicate-display 위반 시 실패 |
 

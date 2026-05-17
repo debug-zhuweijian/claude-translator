@@ -47,6 +47,20 @@ def test_govern_defaults_to_dry_run_and_does_not_change_files(tmp_path: Path, mo
     assert "description: English only" in skill.read_text(encoding="utf-8")
 
 
+def test_govern_accepts_explicit_dry_run_and_does_not_change_files(
+    tmp_path: Path, monkeypatch
+):
+    claude_dir, skill = _prepare_claude_dir(tmp_path)
+    _patch_paths(monkeypatch, claude_dir)
+
+    result = CliRunner().invoke(main, ["govern", "--lang", "zh-CN", "--dry-run"])
+
+    assert result.exit_code == 0
+    assert "No files changed" in result.output
+    assert "planned_description_rewrites=1" in result.output
+    assert "description: English only" in skill.read_text(encoding="utf-8")
+
+
 def test_govern_apply_writes_manifest_and_changes_file(tmp_path: Path, monkeypatch):
     claude_dir, skill = _prepare_claude_dir(tmp_path)
     _patch_paths(monkeypatch, claude_dir)

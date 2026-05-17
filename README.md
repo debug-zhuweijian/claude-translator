@@ -403,7 +403,7 @@ Skill support documents under a skill bundle are ignored unless they are the ent
 | `init --lang LANG` | Create config with target language |
 | `discover [--lang LANG] [--audit]` | List translatable items and optional scan audit summary, including duplicate display groups |
 | `sync [--lang LANG] [--dry-run]` | Translate descriptions and write to files |
-| `govern [--lang LANG] [--apply]` | Plan or apply strict description governance; defaults to dry-run and writes a backup manifest on apply |
+| `govern [--lang LANG] [--dry-run] [--apply]` | Plan or apply strict description governance; defaults to dry-run and writes a backup manifest on apply |
 | `restore --manifest PATH [--apply]` | Preview or restore files from a governance manifest with hash-gated safety |
 | `verify [--lang LANG] [--strict]` | Check coverage, and with `--strict` fail on language-policy or duplicate-display violations |
 

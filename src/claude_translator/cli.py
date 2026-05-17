@@ -274,11 +274,19 @@ def _load_overrides_from_dir(translations_dir: Path, lang: str) -> dict[str, str
 @click.option("--lang", default=None, help="Target language override")
 @click.option("--apply", is_flag=True, default=False, help="Apply planned governance changes")
 @click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Preview governance changes without writing files",
+)
+@click.option(
     "--translation",
     multiple=True,
     help="Governance rewrite mapping in canonical_id=text format",
 )
-def govern(lang: str | None, apply: bool, translation: tuple[str, ...]) -> None:
+def govern(
+    lang: str | None, apply: bool, dry_run: bool, translation: tuple[str, ...]
+) -> None:
     """Plan or apply runtime description governance."""
     config = load_config(config_path=get_config_path(), target_lang=lang)
     translations_dir = get_translations_dir()

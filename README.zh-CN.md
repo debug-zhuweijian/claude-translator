@@ -381,7 +381,7 @@ skill bundle 内部的支持文档会被忽略，除非它是入口文件 `SKILL
 | `init --lang LANG` | 创建配置并设置目标语言 |
 | `discover [--lang LANG] [--audit]` | 列出可翻译条目及可选扫描审计摘要，包括重复展示分组 |
 | `sync [--lang LANG] [--dry-run]` | 翻译描述并写入文件 |
-| `govern [--lang LANG] [--apply]` | 规划或应用严格描述治理；默认只预览，应用时写入备份清单 |
+| `govern [--lang LANG] [--dry-run] [--apply]` | 规划或应用严格描述治理；默认只预览，应用时写入备份清单 |
 | `restore --manifest PATH [--apply]` | 预览或按治理清单恢复文件，并执行哈希安全校验 |
 | `verify [--lang LANG] [--strict]` | 检查覆盖率；加 `--strict` 时对语言策略或重复展示违规返回失败 |
 
