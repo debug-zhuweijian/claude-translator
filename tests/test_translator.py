@@ -143,3 +143,28 @@ def test_empty_description():
     r = chain.translate(_make_record(""))
     assert r.status == "empty"
     assert r.matched_translation == ""
+
+
+def test_translate_preserves_slash_command_tokens():
+    class SlashTranslatingClient:
+        def translate(self, text: str, source_lang: str, target_lang: str) -> str:
+            return text.replace("/deep-interview", "/深度访谈").replace(
+                "/gsd:plan-phase", "/规划阶段"
+            )
+
+    updated: dict[str, str] = {}
+    chain = TranslationChain(
+        overrides={},
+        cache={},
+        on_cache_update=lambda lang, cid, text: updated.__setitem__(cid, text),
+        client=SlashTranslatingClient(),
+        target_lang="zh-CN",
+    )
+
+    r = chain.translate(_make_record("Use /deep-interview before /gsd:plan-phase."))
+
+    assert "/deep-interview" in r.matched_translation
+    assert "/gsd:plan-phase" in r.matched_translation
+    assert "/深度访谈" not in r.matched_translation
+    assert "/规划阶段" not in r.matched_translation
+    assert updated["plugin.test.skill:demo"] == r.matched_translation

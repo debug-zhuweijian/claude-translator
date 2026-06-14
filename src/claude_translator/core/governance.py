@@ -6,11 +6,12 @@ import hashlib
 import json
 import shutil
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
 from claude_translator import __version__
+from claude_translator.core.canonical import parse_canonical_id
 from claude_translator.core.display import DuplicateGroup, find_duplicate_display_groups
 from claude_translator.core.frontmatter import FrontmatterParser
 from claude_translator.core.language_policy import LanguageViolation, check_inventory_language
@@ -33,6 +34,7 @@ class GovernanceAction:
     reason: str
     replacement_description: str
     expected_sha256: str
+    replacement_name: str = ""
 
 
 @dataclass(frozen=True)
@@ -50,8 +52,10 @@ class GovernanceReport:
     duplicate_display_groups: int
     planned_description_rewrites: int
     planned_duplicate_suppressions: int = 0
+    planned_name_repairs: int = 0
     applied_description_rewrites: int = 0
     applied_duplicate_suppressions: int = 0
+    applied_name_repairs: int = 0
     unresolved_duplicate_groups: int = 0
     backup_manifest: str | None = None
 
@@ -64,10 +68,14 @@ class GovernanceReport:
         ]
         if self.planned_duplicate_suppressions:
             parts.append(f"planned_duplicate_suppressions={self.planned_duplicate_suppressions}")
+        if self.planned_name_repairs:
+            parts.append(f"planned_name_repairs={self.planned_name_repairs}")
         if self.applied_description_rewrites:
             parts.append(f"applied_description_rewrites={self.applied_description_rewrites}")
         if self.applied_duplicate_suppressions:
             parts.append(f"applied_duplicate_suppressions={self.applied_duplicate_suppressions}")
+        if self.applied_name_repairs:
+            parts.append(f"applied_name_repairs={self.applied_name_repairs}")
         if self.unresolved_duplicate_groups:
             parts.append(f"unresolved_duplicate_groups={self.unresolved_duplicate_groups}")
         if self.backup_manifest:
@@ -125,6 +133,23 @@ def _description_replacement(record: Record, options: GovernanceOptions) -> str 
     return None
 
 
+def _name_repair_replacement(record: Record) -> str | None:
+    if record.kind != "command":
+        return None
+
+    parser = FrontmatterParser()
+    content = Path(record.source_path).read_text(encoding="utf-8-sig")
+    fm, _ = parser.parse(content)
+    current_name = parser.get_name(fm)
+    if current_name is None:
+        return None
+
+    expected_name = parse_canonical_id(record.canonical_id)[3]
+    if current_name == expected_name:
+        return None
+    return expected_name
+
+
 def create_governance_plan(
     inventory: Inventory,
     options: GovernanceOptions | None = None,
@@ -136,18 +161,28 @@ def create_governance_plan(
 
     for record in inventory.records:
         violation = violations_by_id.get(record.canonical_id)
-        replacement = _description_replacement(record, resolved_options)
-        if violation is None or replacement is None:
+        replacement = (
+            _description_replacement(record, resolved_options) if violation is not None else None
+        )
+        name_replacement = _name_repair_replacement(record)
+        if (violation is None or replacement is None) and name_replacement is None:
             continue
         path = Path(record.source_path)
+        if name_replacement is not None and replacement:
+            action_type = "rewrite_frontmatter"
+        elif name_replacement is not None:
+            action_type = "repair_name"
+        else:
+            action_type = "rewrite_description"
         actions = (
             *actions,
             GovernanceAction(
-                action_type="rewrite_description",
+                action_type=action_type,
                 target=record,
-                reason=violation.reason,
-                replacement_description=replacement,
+                reason=violation.reason if violation is not None else "name_mismatch",
+                replacement_description=replacement or "",
                 expected_sha256=_file_sha256(path),
+                replacement_name=name_replacement or "",
             ),
         )
 
@@ -159,14 +194,17 @@ def create_governance_plan(
     )
 
 
-def _rewrite_description_bytes(path: Path, description: str) -> bytes:
+def _rewrite_frontmatter_bytes(path: Path, *, description: str = "", name: str = "") -> bytes:
     raw = path.read_bytes()
     has_bom = raw.startswith(b"\xef\xbb\xbf")
     content = raw.decode("utf-8-sig" if has_bom else "utf-8")
     newline = detect_newline(content)
     parser = FrontmatterParser()
     fm, body = parser.parse(content)
-    parser.set_description(fm, description)
+    if description:
+        parser.set_description(fm, description)
+    if name:
+        parser.set_name(fm, name)
     new_content = parser.build(fm, body)
     new_content = new_content.replace("\r\n", "\n").replace("\n", newline)
     out = new_content.encode("utf-8")
@@ -207,12 +245,13 @@ def apply_governance_plan(
     options: GovernanceOptions | None = None,
 ) -> GovernanceReport:
     resolved_options = options or GovernanceOptions()
-    run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid4().hex[:8]
+    run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid4().hex[:8]
     backup_dir = _backup_root(resolved_options) / run_id
     backup_dir.mkdir(parents=True, exist_ok=True)
 
     manifest_items: list[dict[str, str]] = []
-    applied = 0
+    applied_descriptions = 0
+    applied_names = 0
     suppressed = 0
 
     for action in plan.actions:
@@ -223,10 +262,17 @@ def apply_governance_plan(
 
         backup_path = backup_dir / f"{len(manifest_items):04d}-{path.name}"
         shutil.copy2(path, backup_path)
-        new_bytes = _rewrite_description_bytes(path, action.replacement_description)
+        new_bytes = _rewrite_frontmatter_bytes(
+            path,
+            description=action.replacement_description,
+            name=action.replacement_name,
+        )
         path.write_bytes(new_bytes)
         new_hash = _sha256_bytes(new_bytes)
-        applied += 1
+        if action.replacement_description:
+            applied_descriptions += 1
+        if action.replacement_name:
+            applied_names += 1
         display_name = action.target.canonical_id.split(":", 1)[1]
         manifest_items.append(
             {
@@ -272,7 +318,7 @@ def apply_governance_plan(
     manifest = {
         "schema_version": 1,
         "run_id": run_id,
-        "created_at": datetime.now(UTC).isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
         "lang": resolved_options.target_lang,
         "tool_version": __version__,
         "items": manifest_items,
@@ -285,10 +331,14 @@ def apply_governance_plan(
         scanned=plan.scanned,
         strict_language_violations=len(plan.language_violations),
         duplicate_display_groups=len(plan.duplicate_groups),
-        planned_description_rewrites=len(plan.actions),
+        planned_description_rewrites=sum(
+            1 for action in plan.actions if action.replacement_description
+        ),
         planned_duplicate_suppressions=len(_duplicate_suppression_targets(plan)),
-        applied_description_rewrites=applied,
+        planned_name_repairs=sum(1 for action in plan.actions if action.replacement_name),
+        applied_description_rewrites=applied_descriptions,
         applied_duplicate_suppressions=suppressed,
+        applied_name_repairs=applied_names,
         unresolved_duplicate_groups=max(len(plan.duplicate_groups) - suppressed, 0),
         backup_manifest=str(manifest_path),
     )

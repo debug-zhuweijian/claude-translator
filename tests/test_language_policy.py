@@ -61,6 +61,56 @@ def test_strict_zh_cn_rejects_english_sentence_residue_after_chinese():
     assert violations[0].reason == "english_sentence_residue"
 
 
+def test_strict_zh_cn_rejects_english_heavy_description_with_cjk_triggers():
+    violations = check_description_language(
+        _record(
+            "12-agent academic paper writing pipeline. 10 modes "
+            "(full/plan/outline/revision). Triggers: write paper, "
+            "academic paper, 寫論文, 學術論文."
+        ),
+        "zh-CN",
+    )
+
+    assert len(violations) == 1
+    assert violations[0].reason == "english_text_residue"
+
+
+def test_strict_zh_cn_accepts_slash_commands_and_trigger_phrases():
+    record = _record(
+        "PUA KPI 报告卡 — 生成段位和绩效报告。/pua:kpi。"
+        "触发关键词：'/pua:kpi'、'pua kpi'、'performance report'、'generate kpi'。"
+    )
+
+    assert check_description_language(record, "zh-CN") == ()
+
+
+def test_strict_zh_cn_accepts_command_usage_and_long_trigger_list():
+    record = _record(
+        "PUA 我们不养闲Agent。"
+        "/pua:pua [p7|p9|p10|pro|yes|mama|loop|on|off|kpi|survey|flavor|任务描述]，"
+        "或直接子命令 /pua:p7 /pua:p9 /pua:p10 /pua:pro /pua:yes /pua:mama "
+        "/pua:pua-loop /pua:on /pua:off /pua:kpi /pua:survey /pua:flavor "
+        "/pua:cancel-pua-loop。"
+        "触发关键词：'/pua:pua'、'/pua:pua yes'、'/pua:pua mama'、"
+        "'/pua:pua p7'、'pua yes'、'pua p7'、'pua mama'。"
+    )
+
+    assert check_description_language(record, "zh-CN") == ()
+
+
+def test_strict_zh_cn_still_rejects_english_before_trigger_list():
+    violations = check_description_language(
+        _record(
+            "12-agent academic paper writing pipeline. 10 modes. "
+            "触发关键词：'/academic-paper'、'write paper'、'academic paper'。"
+        ),
+        "zh-CN",
+    )
+
+    assert len(violations) == 1
+    assert violations[0].reason == "english_text_residue"
+
+
 def test_check_inventory_language_reports_each_bad_record():
     inventory = Inventory(
         (

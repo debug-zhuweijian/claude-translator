@@ -42,8 +42,16 @@ class FrontmatterParser:
         value = fm.get("description")
         return str(value) if value is not None else None
 
+    def get_name(self, fm: CommentedMap) -> str | None:
+        value = fm.get("name")
+        return str(value) if value is not None else None
+
     def set_description(self, fm: CommentedMap, description: str) -> CommentedMap:
         fm["description"] = description
+        return fm
+
+    def set_name(self, fm: CommentedMap, name: str) -> CommentedMap:
+        fm["name"] = name
         return fm
 
     def build(self, fm: CommentedMap, body: str) -> str:

@@ -52,9 +52,7 @@ def test_govern_defaults_to_dry_run_and_does_not_change_files(tmp_path: Path, mo
     assert "description: English only" in skill.read_text(encoding="utf-8")
 
 
-def test_govern_accepts_explicit_dry_run_and_does_not_change_files(
-    tmp_path: Path, monkeypatch
-):
+def test_govern_accepts_explicit_dry_run_and_does_not_change_files(tmp_path: Path, monkeypatch):
     claude_dir, skill = _prepare_claude_dir(tmp_path)
     _patch_paths(monkeypatch, claude_dir)
 
@@ -120,6 +118,24 @@ def test_restore_defaults_to_dry_run_and_apply_restores_file(tmp_path: Path, mon
     assert "description: English only" in skill.read_text(encoding="utf-8")
 
 
+def test_verify_strict_fails_on_translated_command_name(tmp_path: Path, monkeypatch):
+    claude_dir = tmp_path / ".claude"
+    command = claude_dir / "commands" / "code-review.md"
+    command.parent.mkdir(parents=True)
+    command.write_text(
+        "---\nname: 代码审查\ndescription: 中文说明\n---\n# Code Review\n",
+        encoding="utf-8",
+    )
+    (claude_dir / "translations").mkdir(parents=True, exist_ok=True)
+    _patch_paths(monkeypatch, claude_dir)
+
+    result = CliRunner().invoke(main, ["verify", "--lang", "zh-CN", "--strict"])
+
+    assert result.exit_code == 1
+    assert "NAME_MISMATCH" in result.output
+    assert "user.command:code-review" in result.output
+
+
 def test_verify_strict_fails_on_language_violation(tmp_path: Path, monkeypatch):
     claude_dir, _ = _prepare_claude_dir(tmp_path)
     _patch_paths(monkeypatch, claude_dir)
@@ -150,6 +166,84 @@ def test_verify_strict_fails_on_duplicate_display_group(tmp_path: Path, monkeypa
     assert result.exit_code == 1
     assert "DUPLICATE_DISPLAY" in result.output
     assert "skill:demo" in result.output
+
+
+def test_verify_strict_fails_on_unknown_plugin_dotted_entrypoint(tmp_path: Path, monkeypatch):
+    claude_dir, _ = _prepare_claude_dir(tmp_path, "中文说明")
+    plugin_dir = tmp_path / "cache" / "market" / "demo-plugin" / "1.0.0"
+    hidden_command = plugin_dir / ".unknown" / "commands"
+    hidden_command.mkdir(parents=True)
+    (hidden_command / "promote.md").write_text(
+        "---\ndescription: Hidden command\n---\n# Promote\n",
+        encoding="utf-8",
+    )
+    plugins_dir = claude_dir / "plugins"
+    plugins_dir.mkdir(parents=True, exist_ok=True)
+    (plugins_dir / "installed_plugins.json").write_text(
+        '{"version": 2, "plugins": {"demo-plugin@market": [{"installPath": "'
+        + str(plugin_dir).replace("\\", "\\\\")
+        + '", "version": "1.0.0"}]}}',
+        encoding="utf-8",
+    )
+    _patch_paths(monkeypatch, claude_dir)
+
+    result = CliRunner().invoke(main, ["verify", "--lang", "zh-CN", "--strict"])
+
+    assert result.exit_code == 1
+    assert "UNKNOWN_DOTTED_ENTRYPOINT" in result.output
+    assert ".unknown" in result.output
+    assert "Unknown dotted plugin entrypoint directory" in result.output
+
+
+def test_verify_non_strict_allows_unknown_plugin_dotted_entrypoint(tmp_path: Path, monkeypatch):
+    claude_dir, _ = _prepare_claude_dir(tmp_path, "中文说明")
+    plugin_dir = tmp_path / "cache" / "market" / "demo-plugin" / "1.0.0"
+    hidden_command = plugin_dir / ".unknown" / "commands"
+    hidden_command.mkdir(parents=True)
+    (hidden_command / "promote.md").write_text(
+        "---\ndescription: Hidden command\n---\n# Promote\n",
+        encoding="utf-8",
+    )
+    plugins_dir = claude_dir / "plugins"
+    plugins_dir.mkdir(parents=True, exist_ok=True)
+    (plugins_dir / "installed_plugins.json").write_text(
+        '{"version": 2, "plugins": {"demo-plugin@market": [{"installPath": "'
+        + str(plugin_dir).replace("\\", "\\\\")
+        + '", "version": "1.0.0"}]}}',
+        encoding="utf-8",
+    )
+    _patch_paths(monkeypatch, claude_dir)
+
+    result = CliRunner().invoke(main, ["verify", "--lang", "zh-CN"])
+
+    assert result.exit_code == 0
+    assert "UNKNOWN_DOTTED_ENTRYPOINT" not in result.output
+
+
+def test_govern_apply_ignores_plugin_compatibility_mirrors(tmp_path: Path, monkeypatch):
+    claude_dir, _ = _prepare_claude_dir(tmp_path, "中文说明")
+    user_command = claude_dir / "commands" / "promote.md"
+    _write_entrypoint(user_command, "中文说明")
+    plugin_dir = tmp_path / "cache" / "market" / "demo-plugin" / "1.0.0"
+    _write_skill(plugin_dir / "skills" / "demo" / "SKILL.md", "中文说明")
+    _write_skill(plugin_dir / ".agents" / "skills" / "demo" / "SKILL.md", "English mirror")
+    _write_entrypoint(plugin_dir / "commands" / "promote.md", "中文说明")
+    _write_entrypoint(plugin_dir / ".opencode" / "commands" / "promote.md", "English mirror")
+    plugins_dir = claude_dir / "plugins"
+    plugins_dir.mkdir(parents=True, exist_ok=True)
+    (plugins_dir / "installed_plugins.json").write_text(
+        '{"version": 2, "plugins": {"demo-plugin@market": [{"installPath": "'
+        + str(plugin_dir).replace("\\", "\\\\")
+        + '", "version": "1.0.0"}]}}',
+        encoding="utf-8",
+    )
+    _patch_paths(monkeypatch, claude_dir)
+
+    result = CliRunner().invoke(main, ["govern", "--lang", "zh-CN", "--apply"])
+    verified = CliRunner().invoke(main, ["verify", "--lang", "zh-CN", "--strict"])
+
+    assert result.exit_code == 0
+    assert verified.exit_code == 0
 
 
 def test_discover_audit_reports_duplicate_display_groups(tmp_path: Path, monkeypatch):
@@ -191,8 +285,7 @@ def test_govern_apply_autofills_missing_descriptions_and_suppresses_duplicates(
     )
     translations_dir = claude_dir / "translations"
     (translations_dir / "cache-zh-CN.json").write_text(
-        '{"_schema_version": 1, "user.skill:demo": "缓存中文", '
-        '"user.command:demo": "命令中文"}',
+        '{"_schema_version": 1, "user.skill:demo": "缓存中文", "user.command:demo": "命令中文"}',
         encoding="utf-8",
     )
     _patch_paths(monkeypatch, claude_dir)

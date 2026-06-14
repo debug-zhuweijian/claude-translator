@@ -129,6 +129,104 @@ def test_discover_nested_user_skill_bundles(tmp_path: Path):
     }
 
 
+def test_discover_reads_bom_frontmatter(tmp_path: Path):
+    claude_dir = tmp_path / ".claude"
+    command = claude_dir / "commands" / "review.md"
+    command.parent.mkdir(parents=True)
+    command.write_bytes(b"\xef\xbb\xbf---\ndescription: Review code\n---\n# Review\n")
+
+    inv = discover_all(claude_dir)
+
+    assert inv.size() == 1
+    assert inv.records[0].frontmatter_present is True
+    assert inv.records[0].current_description == "Review code"
+
+
+def test_discover_ignores_dotted_dirs_below_scanned_roots(tmp_path: Path):
+    claude_dir = tmp_path / ".claude"
+    hidden_skill = claude_dir / "skills" / ".hidden" / "SKILL.md"
+    hidden_skill.parent.mkdir(parents=True)
+    hidden_skill.write_text("---\ndescription: Hidden skill\n---\n# Hidden\n")
+    plugin_dir = tmp_path / "cache" / "market" / "my-plugin" / "1.0.0"
+    mirror_command = plugin_dir / "commands" / ".opencode"
+    mirror_command.mkdir(parents=True)
+    (mirror_command / "promote.md").write_text("---\ndescription: Mirror command\n---\n# Promote\n")
+
+    _write_plugins_json(claude_dir, [{"installation_path": str(plugin_dir)}])
+    inv = discover_all(claude_dir)
+
+    assert inv.size() == 0
+
+
+def test_discover_ignores_plugin_compatibility_mirror_entries(tmp_path: Path):
+    claude_dir = tmp_path / ".claude"
+    plugin_dir = tmp_path / "cache" / "market" / "my-plugin" / "1.0.0"
+    skill = plugin_dir / "skills" / "demo"
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_text("---\ndescription: Main skill\n---\n# Demo\n")
+    mirror_skill = plugin_dir / ".agents" / "skills" / "demo"
+    mirror_skill.mkdir(parents=True)
+    (mirror_skill / "SKILL.md").write_text("---\ndescription: Mirror skill\n---\n# Demo\n")
+    command = plugin_dir / "commands"
+    command.mkdir()
+    (command / "promote.md").write_text("---\ndescription: Main command\n---\n# Promote\n")
+    mirror_command = plugin_dir / ".opencode" / "commands"
+    mirror_command.mkdir(parents=True)
+    (mirror_command / "promote.md").write_text("---\ndescription: Mirror command\n---\n# Promote\n")
+    for known_dir in (".claude", ".cursor", ".kiro"):
+        known_skill = plugin_dir / known_dir / "skills" / "demo" / "SKILL.md"
+        known_skill.parent.mkdir(parents=True)
+        known_skill.write_text(
+            "---\ndescription: Compatibility skill\n---\n# Demo\n",
+            encoding="utf-8",
+        )
+
+    _write_plugins_json(claude_dir, [{"installation_path": str(plugin_dir)}])
+    inv = discover_all(claude_dir)
+
+    assert {r.canonical_id for r in inv.records} == {
+        "plugin.my-plugin.skill:demo",
+        "plugin.my-plugin.command:promote",
+    }
+    assert inv.diagnostics == ()
+
+
+def test_discover_reports_unknown_plugin_dotted_entrypoints(tmp_path: Path):
+    claude_dir = tmp_path / ".claude"
+    plugin_dir = tmp_path / "cache" / "market" / "my-plugin" / "1.0.0"
+    hidden_command = plugin_dir / ".unknown" / "commands"
+    hidden_command.mkdir(parents=True)
+    (hidden_command / "promote.md").write_text("---\ndescription: Hidden command\n---\n# Promote\n")
+    skill = plugin_dir / "skills" / "demo"
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_text("---\ndescription: Main skill\n---\n# Demo\n")
+
+    _write_plugins_json(claude_dir, [{"installation_path": str(plugin_dir)}])
+    inv = discover_all(claude_dir)
+
+    assert {r.canonical_id for r in inv.records} == {"plugin.my-plugin.skill:demo"}
+    assert len(inv.diagnostics) == 1
+    assert inv.diagnostics[0].kind == "UNKNOWN_DOTTED_ENTRYPOINT"
+    assert ".unknown" in inv.diagnostics[0].path
+
+
+def test_discover_ignores_unknown_dotted_dirs_without_entrypoints(tmp_path: Path):
+    claude_dir = tmp_path / ".claude"
+    plugin_dir = tmp_path / "cache" / "market" / "my-plugin" / "1.0.0"
+    notes = plugin_dir / ".unknown" / "notes"
+    notes.mkdir(parents=True)
+    (notes / "README.md").write_text("# Not an entrypoint\n")
+    skill = plugin_dir / "skills" / "demo"
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_text("---\ndescription: Main skill\n---\n# Demo\n")
+
+    _write_plugins_json(claude_dir, [{"installation_path": str(plugin_dir)}])
+    inv = discover_all(claude_dir)
+
+    assert {r.canonical_id for r in inv.records} == {"plugin.my-plugin.skill:demo"}
+    assert inv.diagnostics == ()
+
+
 def test_discover_nested_plugin_entries(tmp_path: Path):
     claude_dir = tmp_path / ".claude"
     plugin_dir = tmp_path / "cache" / "market" / "my-plugin" / "1.0.0"
@@ -150,6 +248,32 @@ def test_discover_nested_plugin_entries(tmp_path: Path):
         "plugin.my-plugin.agent:review:security",
         "plugin.my-plugin.skill:composio-skills:tool-a",
     }
+
+
+def test_discover_plugin_top_level_skill_directories(tmp_path: Path):
+    claude_dir = tmp_path / ".claude"
+    plugin_dir = tmp_path / "cache" / "academic" / "academic-research-skills" / "3.9.4"
+    skill = plugin_dir / "academic-paper"
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_text(
+        "---\ndescription: 12-agent academic paper writing pipeline\n---\n# Academic Paper\n",
+        encoding="utf-8",
+    )
+
+    _write_plugins_v2_json(
+        claude_dir,
+        {
+            "academic-research-skills@academic": [
+                {"scope": "user", "installPath": str(plugin_dir), "version": "3.9.4"}
+            ]
+        },
+    )
+    inv = discover_all(claude_dir)
+
+    assert {r.canonical_id for r in inv.records} == {
+        "plugin.academic-research-skills.skill:academic-paper"
+    }
+    assert inv.records[0].relative_path == "academic-paper/SKILL.md"
 
 
 def test_discover_multi_version_dedup(tmp_path: Path):

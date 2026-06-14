@@ -25,10 +25,18 @@ class Record:
 
 
 @dataclass(frozen=True)
+class Diagnostic:
+    kind: str
+    path: str
+    message: str
+
+
+@dataclass(frozen=True)
 class Inventory:
     """Immutable collection of discovered Records."""
 
     records: tuple[Record, ...]
+    diagnostics: tuple[Diagnostic, ...] = ()
 
     def find_by_canonical_id(self, cid: str) -> Record | None:
         for r in self.records:

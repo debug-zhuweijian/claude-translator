@@ -84,6 +84,65 @@ def test_apply_governance_plan_rewrites_after_backup_and_writes_manifest(tmp_pat
     assert Path(manifest["items"][0]["backup_path"]).exists()
 
 
+def test_name_repair_does_not_rewrite_valid_description_from_translation_cache(tmp_path: Path):
+    command = tmp_path / "plugin" / "commands" / "code-review.md"
+    command.parent.mkdir(parents=True)
+    command.write_text(
+        "---\nname: 代码审查\ndescription: 已有中文说明\n---\n# Body\n",
+        encoding="utf-8",
+    )
+    entry = Record(
+        canonical_id="plugin.everything-claude-code.command:code-review",
+        kind="command",
+        scope="plugin",
+        source_path=str(command),
+        relative_path="commands/code-review.md",
+        plugin_key="everything-claude-code",
+        current_description="已有中文说明",
+        frontmatter_present=True,
+    )
+    options = GovernanceOptions(
+        target_lang="zh-CN",
+        translations={"plugin.everything-claude-code.command:code-review": "缓存中文说明"},
+        backup_root=tmp_path / "backups",
+    )
+
+    report = apply_governance_plan(create_governance_plan(Inventory((entry,)), options), options)
+
+    content = command.read_text(encoding="utf-8")
+    assert report.applied_description_rewrites == 0
+    assert report.applied_name_repairs == 1
+    assert "name: code-review" in content
+    assert "description: 已有中文说明" in content
+
+
+def test_apply_governance_plan_repairs_translated_command_name(tmp_path: Path):
+    command = tmp_path / "plugin" / "commands" / "code-review.md"
+    command.parent.mkdir(parents=True)
+    command.write_text(
+        "---\nname: 代码审查\ndescription: 中文说明\n---\n# Body\n",
+        encoding="utf-8",
+    )
+    entry = Record(
+        canonical_id="plugin.everything-claude-code.command:code-review",
+        kind="command",
+        scope="plugin",
+        source_path=str(command),
+        relative_path="commands/code-review.md",
+        plugin_key="everything-claude-code",
+        current_description="中文说明",
+        frontmatter_present=True,
+    )
+    options = GovernanceOptions(target_lang="zh-CN", backup_root=tmp_path / "backups")
+
+    report = apply_governance_plan(create_governance_plan(Inventory((entry,)), options), options)
+
+    content = command.read_text(encoding="utf-8")
+    assert report.applied_name_repairs == 1
+    assert "name: code-review" in content
+    assert "description: 中文说明" in content
+
+
 def test_restore_from_manifest_defaults_to_dry_run(tmp_path: Path):
     entry = _record(tmp_path / "skill" / "SKILL.md", "user.skill:test", "English only")
     options = GovernanceOptions(
@@ -137,9 +196,7 @@ def test_restore_from_manifest_refuses_hash_mismatch(tmp_path: Path):
 
 
 def test_create_governance_plan_autofills_empty_descriptions(tmp_path: Path):
-    entry = _record(
-        tmp_path / "agents" / "demo.md", "user.agent:demo-agent", "", kind="agent"
-    )
+    entry = _record(tmp_path / "agents" / "demo.md", "user.agent:demo-agent", "", kind="agent")
     inventory = Inventory((entry,))
 
     plan = create_governance_plan(inventory, GovernanceOptions(target_lang="zh-CN"))
@@ -153,9 +210,7 @@ def test_create_governance_plan_autofills_empty_descriptions(tmp_path: Path):
 def test_create_governance_plan_autofills_empty_descriptions_for_ja_and_ko(
     tmp_path: Path,
 ):
-    entry = _record(
-        tmp_path / "agents" / "demo.md", "user.agent:demo-agent", "", kind="agent"
-    )
+    entry = _record(tmp_path / "agents" / "demo.md", "user.agent:demo-agent", "", kind="agent")
     inventory = Inventory((entry,))
 
     ja_plan = create_governance_plan(inventory, GovernanceOptions(target_lang="ja"))

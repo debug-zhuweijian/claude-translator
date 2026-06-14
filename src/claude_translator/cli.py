@@ -284,9 +284,7 @@ def _load_overrides_from_dir(translations_dir: Path, lang: str) -> dict[str, str
     multiple=True,
     help="Governance rewrite mapping in canonical_id=text format",
 )
-def govern(
-    lang: str | None, apply: bool, dry_run: bool, translation: tuple[str, ...]
-) -> None:
+def govern(lang: str | None, apply: bool, dry_run: bool, translation: tuple[str, ...]) -> None:
     """Plan or apply runtime description governance."""
     config = load_config(config_path=get_config_path(), target_lang=lang)
     translations_dir = get_translations_dir()
@@ -368,11 +366,22 @@ def verify(lang: str | None, strict: bool) -> None:
     if strict:
         language_violations = check_inventory_language(inventory, config.target_lang)
         duplicate_groups = find_duplicate_display_groups(inventory.records)
+        governance_plan = create_governance_plan(inventory, GovernanceOptions(config.target_lang))
+        name_repairs = tuple(
+            action for action in governance_plan.actions if action.replacement_name
+        )
         for violation in language_violations:
             click.echo(f"  STRICT_LANGUAGE: {violation.canonical_id} ({violation.reason})")
         for group in duplicate_groups:
             click.echo(f"  DUPLICATE_DISPLAY: {group.display_key.kind}:{group.display_key.name}")
-        if language_violations or duplicate_groups:
+        for action in name_repairs:
+            click.echo(
+                f"  NAME_MISMATCH: {action.target.canonical_id} "
+                f"(expected {action.replacement_name})"
+            )
+        for diagnostic in inventory.diagnostics:
+            click.echo(f"  {diagnostic.kind}: {diagnostic.path} ({diagnostic.message})")
+        if language_violations or duplicate_groups or name_repairs or inventory.diagnostics:
             sys.exit(1)
 
     total = inventory.size()

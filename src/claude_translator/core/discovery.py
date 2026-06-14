@@ -10,7 +10,7 @@ from packaging.version import InvalidVersion, Version
 
 from claude_translator.core.canonical import generate_canonical_id, name_from_filename
 from claude_translator.core.frontmatter import FrontmatterParser
-from claude_translator.core.models import Inventory, Record
+from claude_translator.core.models import Diagnostic, Inventory, Record
 from claude_translator.utils.paths import normalize_path
 
 logger = logging.getLogger(__name__)
@@ -19,15 +19,16 @@ DIR_KIND_MAP: dict[str, str] = {
     "skills": "skill",
     "commands": "command",
     "agents": "agent",
-    ".agents/skills": "skill",
-    ".agents/commands": "command",
-    ".opencode/commands": "command",
 }
+
+KNOWN_DOTTED_PLUGIN_DIRS = frozenset({".agents", ".claude", ".cursor", ".kiro", ".opencode"})
+UNKNOWN_DOTTED_ENTRYPOINT = "UNKNOWN_DOTTED_ENTRYPOINT"
 
 
 def discover_all(claude_dir: Path) -> Inventory:
     """Discover all translatable items from plugins and user-level directories."""
     records: list[Record] = []
+    diagnostics: list[Diagnostic] = []
     seen_ids: set[str] = set()
 
     for r in _discover_user_level(claude_dir):
@@ -35,12 +36,14 @@ def discover_all(claude_dir: Path) -> Inventory:
             records.append(r)
             seen_ids.add(r.canonical_id)
 
-    for r in _discover_plugins(claude_dir):
+    plugin_records, plugin_diagnostics = _discover_plugins(claude_dir)
+    diagnostics.extend(plugin_diagnostics)
+    for r in plugin_records:
         if r.canonical_id not in seen_ids:
             records.append(r)
             seen_ids.add(r.canonical_id)
 
-    return Inventory(tuple(records))
+    return Inventory(tuple(records), tuple(diagnostics))
 
 
 def _discover_user_level(claude_dir: Path) -> list[Record]:
@@ -56,7 +59,7 @@ def _discover_user_level(claude_dir: Path) -> list[Record]:
     return records
 
 
-def _discover_plugins(claude_dir: Path) -> list[Record]:
+def _discover_plugins(claude_dir: Path) -> tuple[list[Record], list[Diagnostic]]:
     # Try both known locations for the plugin registry
     candidates = [
         claude_dir / "plugins" / "installed_plugins.json",  # Claude Code v2+
@@ -70,13 +73,13 @@ def _discover_plugins(claude_dir: Path) -> list[Record]:
 
     if plugins_file is None:
         logger.info("No installed_plugins.json found")
-        return []
+        return [], []
 
     try:
-        data = json.loads(plugins_file.read_text(encoding="utf-8"))
+        data = json.loads(plugins_file.read_text(encoding="utf-8-sig"))
     except (json.JSONDecodeError, OSError) as e:
         logger.warning("Failed to read installed_plugins.json: %s", e)
-        return []
+        return [], []
 
     # Support both formats:
     #   v2: {"version": 2, "plugins": {"key@market": [{installPath: "..."}]}}
@@ -93,7 +96,7 @@ def _discover_plugins(claude_dir: Path) -> list[Record]:
                     entries.append(merged)
 
     if not entries:
-        return []
+        return [], []
 
     # Deduplicate: keep only latest version per plugin_key
     latest: dict[str, tuple[dict, Path]] = {}
@@ -111,11 +114,14 @@ def _discover_plugins(claude_dir: Path) -> list[Record]:
             latest[plugin_key] = (entry, plugin_dir)
 
     records: list[Record] = []
+    diagnostics: list[Diagnostic] = []
     parser = FrontmatterParser()
     for plugin_key, (_, plugin_dir) in latest.items():
-        records.extend(_scan_plugin_dir(plugin_dir, plugin_key, parser))
+        plugin_records, plugin_diagnostics = _scan_plugin_dir(plugin_dir, plugin_key, parser)
+        records.extend(plugin_records)
+        diagnostics.extend(plugin_diagnostics)
 
-    return records
+    return records, diagnostics
 
 
 def _extract_version(path: Path) -> Version:
@@ -134,7 +140,9 @@ def _extract_plugin_key(plugin_dir: Path) -> str:
     return plugin_dir.parent.name
 
 
-def _scan_plugin_dir(plugin_dir: Path, plugin_key: str, parser: FrontmatterParser) -> list[Record]:
+def _scan_plugin_dir(
+    plugin_dir: Path, plugin_key: str, parser: FrontmatterParser
+) -> tuple[list[Record], list[Diagnostic]]:
     records: list[Record] = []
 
     for dir_name, kind in DIR_KIND_MAP.items():
@@ -145,7 +153,67 @@ def _scan_plugin_dir(plugin_dir: Path, plugin_key: str, parser: FrontmatterParse
             _scan_root(target_dir, kind=kind, scope="plugin", plugin_key=plugin_key, parser=parser)
         )
 
-    return records
+    top_level_records, diagnostics = _scan_top_level_skill_dirs(plugin_dir, plugin_key, parser)
+    records.extend(top_level_records)
+
+    return records, diagnostics
+
+
+def _scan_top_level_skill_dirs(
+    plugin_dir: Path, plugin_key: str, parser: FrontmatterParser
+) -> tuple[list[Record], list[Diagnostic]]:
+    records: list[Record] = []
+    diagnostics: list[Diagnostic] = []
+    reserved_dirs = {path.split("/", 1)[0] for path in DIR_KIND_MAP}
+
+    for entry in sorted(plugin_dir.iterdir()):
+        skill_file = entry / "SKILL.md"
+        if not entry.is_dir() or entry.name in reserved_dirs:
+            continue
+        if entry.name.startswith("."):
+            if entry.name not in KNOWN_DOTTED_PLUGIN_DIRS and _contains_entrypoint(entry):
+                diagnostics.append(
+                    Diagnostic(
+                        kind=UNKNOWN_DOTTED_ENTRYPOINT,
+                        path=normalize_path(str(entry.relative_to(plugin_dir))),
+                        message=f"Unknown dotted plugin entrypoint directory: {entry.name}",
+                    )
+                )
+            continue
+        if not skill_file.is_file():
+            continue
+
+        content = skill_file.read_text(encoding="utf-8-sig")
+        fm, _ = parser.parse(content)
+        desc = parser.get_description(fm) or ""
+        relative = skill_file.relative_to(plugin_dir)
+        cid = generate_canonical_id(
+            kind="skill", name=entry.name, scope="plugin", plugin_key=plugin_key
+        )
+        records.append(
+            Record(
+                canonical_id=cid,
+                kind="skill",
+                scope="plugin",
+                source_path=str(skill_file),
+                relative_path=normalize_path(str(relative)),
+                plugin_key=plugin_key,
+                current_description=desc,
+                frontmatter_present=bool(fm),
+            )
+        )
+
+    return records, diagnostics
+
+
+def _contains_entrypoint(path: Path) -> bool:
+    for md_file in path.rglob("*.md"):
+        relative = md_file.relative_to(path)
+        if md_file.name == "SKILL.md":
+            return True
+        if relative.parts and relative.parts[0] in DIR_KIND_MAP:
+            return True
+    return False
 
 
 def _scan_root(
@@ -160,12 +228,14 @@ def _scan_root(
 
     for md_file in sorted(root.rglob("*.md")):
         relative = md_file.relative_to(root)
+        if any(part.startswith(".") for part in relative.parts):
+            continue
         name = _name_from_entrypoint(relative, kind)
         if name is None:
             continue
 
         cid = generate_canonical_id(kind=kind, name=name, scope=scope, plugin_key=plugin_key)
-        content = md_file.read_text(encoding="utf-8")
+        content = md_file.read_text(encoding="utf-8-sig")
         fm, _ = parser.parse(content)
         desc = parser.get_description(fm) or ""
 

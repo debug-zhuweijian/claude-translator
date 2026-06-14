@@ -3,14 +3,33 @@
 from __future__ import annotations
 
 import logging
+import re
 from collections.abc import Callable
 from dataclasses import replace
 from typing import Any
 
 from claude_translator.clients.base import AsyncLLMClient, LLMClient
 from claude_translator.core.models import Record
+from claude_translator.core.patterns import SLASH_COMMAND_RE
 
 logger = logging.getLogger(__name__)
+
+
+def _protect_slash_commands(text: str) -> tuple[str, tuple[str, ...]]:
+    tokens: list[str] = []
+
+    def replace_match(match: re.Match[str]) -> str:
+        tokens.append(match.group(0))
+        return f"__CLAUDE_TRANSLATOR_SLASH_COMMAND_{len(tokens) - 1}__"
+
+    return SLASH_COMMAND_RE.sub(replace_match, text), tuple(tokens)
+
+
+def _restore_slash_commands(text: str, tokens: tuple[str, ...]) -> str:
+    result = text
+    for index, token in enumerate(tokens):
+        result = result.replace(f"__CLAUDE_TRANSLATOR_SLASH_COMMAND_{index}__", token)
+    return result
 
 
 class TranslationChain:
@@ -92,7 +111,9 @@ class TranslationChain:
             return replace(record, matched_translation=self._cache[cid], status="cache")
 
         try:
-            translation = self._get_client().translate(desc, "en", self._target_lang)
+            protected_desc, slash_commands = _protect_slash_commands(desc)
+            translation = self._get_client().translate(protected_desc, "en", self._target_lang)
+            translation = _restore_slash_commands(translation, slash_commands)
             self._on_cache_update(self._target_lang, cid, translation)
             self._cache[cid] = translation
             return replace(record, matched_translation=translation, status="llm")
@@ -116,7 +137,11 @@ class TranslationChain:
             return replace(record, matched_translation=self._cache[cid], status="cache")
 
         try:
-            translation = await self._get_async_client().translate(desc, "en", self._target_lang)
+            protected_desc, slash_commands = _protect_slash_commands(desc)
+            translation = await self._get_async_client().translate(
+                protected_desc, "en", self._target_lang
+            )
+            translation = _restore_slash_commands(translation, slash_commands)
             async with self._get_cache_lock():
                 self._on_cache_update(self._target_lang, cid, translation)
                 self._cache[cid] = translation
