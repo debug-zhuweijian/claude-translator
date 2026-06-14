@@ -10,3 +10,23 @@ build/
 *.egg
 .coverage
 htmlcov/
+
+# Local secrets and runtime configuration
+.env
+*.env
+*.key
+*.token
+config.local.*
+secrets.*
+auths/*.json
+
+# Local runtime data and reports
+*.db
+*.db-wal
+*.db-shm
+*.log
+logs/
+.omc/
+graphify-out/
+exports/
+tmp/
